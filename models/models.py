@@ -45,11 +45,15 @@ class TransformerModel(K.Model):
         sequence_length=30,
         alphabet=False,
         dropout=0,
+        precursor_units=None,
+        inject_position="all" # all | pre | post
     ):
         super(TransformerModel, self).__init__()
         self.ru = running_units
         self.depth = depth
         self.prec_type = prec_type
+        self.prec_units = running_units if precursor_units == None else precursor_units
+        self.inject_pos = inject_position
         
         # Positional
         if learned_pos:
@@ -112,8 +116,17 @@ class TransformerModel(K.Model):
 
     def Main(self, x, tb_emb=None):
         out = x
-        for layer in self.main:
-            out = layer(out, temb=tb_emb)
+        for i in range(len(self.main)):
+            layer = self.main[i]
+
+            if self.inject_pos == "all":
+                out = layer(out, temb=tb_emb)
+            elif self.inject_pos == "pre" and i == 0:
+                out = layer(out, temb=tb_emb)
+            elif self.inject_pos == "post" and i == len(self.main)-1:
+                out = layer(out, temb=tb_emb)
+            else:
+                out = layer(out, None)
 
         return out
 
@@ -121,10 +134,10 @@ class TransformerModel(K.Model):
         out = self.EmbedInputs(x['sequence'], x['precursor_charge'], x['collision_energy'])
         out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]
         tb_emb = None
-        if self.prec_type == 'pretoken':
+        if self.prec_type == 'pretoken': 
             charge_ce_token = self.charge_embedder(x['precursor_charge']) + self.ce_embedder(x['collision_energy'])
             out = tf.concat([charge_ce_token[:,None], out], axis=1)
-        elif self.prec_type in ['inject_pre', 'inject_ffn']:
+        elif self.prec_type in ['inject_pre', 'inject_ffn']:    # if chosen inject into transformer blocks
             charge_ce_embedding = tf.concat([
                 self.charge_embedder(x['precursor_charge']),
                 self.ce_embedder(x['collision_energy'])
