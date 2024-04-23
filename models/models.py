@@ -119,11 +119,9 @@ class TransformerModel(K.Model):
         for i in range(len(self.main)):
             layer = self.main[i]
 
-            if self.inject_pos == "all":
-                out = layer(out, temb=tb_emb)
-            elif self.inject_pos == "pre" and i == 0:
-                out = layer(out, temb=tb_emb)
-            elif self.inject_pos == "post" and i == len(self.main)-1:
+            if (self.inject_pos == "all") or \
+               (self.inject_pos == "pre" and i == 0) or \
+               (self.inject_pos == "post" and i == len(self.main) - 1):
                 out = layer(out, temb=tb_emb)
             else:
                 out = layer(out, None)
