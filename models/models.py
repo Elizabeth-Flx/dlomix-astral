@@ -25,6 +25,11 @@ ALPHABET_UNMOD = {
     "V": 18,
     "W": 19,
     "Y": 20,
+    "M[UNIMOD:35]": 21,
+    "R[UNIMOD:7]":22,
+    "C[UNIMOD:4]": 2,
+    "Q[UNIMOD:7]":4,
+    "N[UNIMOD:7]":3,
 }
 
 class TransformerModel(K.Model):
@@ -129,7 +134,10 @@ class TransformerModel(K.Model):
         return out
 
     def call(self, x, training=False):
-        out = self.EmbedInputs(x['sequence'], x['precursor_charge'], x['collision_energy'])
+
+        #out = self.EmbedInputs(x['sequence'], x['precursor_charge'], x['collision_energy'])
+        out = self.EmbedInputs(x['_parsed_sequence'], x['precursor_charge_onehot'], x['collision_energy_aligned_normed'])
+
         out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]
         tb_emb = None
         if self.prec_type == 'pretoken': 
@@ -141,7 +149,7 @@ class TransformerModel(K.Model):
                 self.ce_embedder(x['collision_energy'])
             ], axis=-1)
             tb_emb = tf.nn.silu(charge_ce_embedding)
-        out = self.Main(out, tb_emb=tb_emb)
+        out = self.Main(out, tb_emb=tb_emb)     # Transformer blocks
         out = self.penultimate(out)
         out = self.final(out)
 

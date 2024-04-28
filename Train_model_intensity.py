@@ -40,9 +40,9 @@ PTMS_ALPHABET = {
 }
 
 rt_data = FragmentIonIntensityDataset(
-    data_source="/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_train.parquet",
-    val_data_source="/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_val.parquet",
-    test_data_source="/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_test.parquet",
+    data_source="/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_train.parquet",
+    val_data_source="/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_val.parquet",
+    test_data_source="/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_test.parquet",
     data_format="parquet", 
     val_ratio=0.2, max_seq_len=30, encoding_scheme="naive-mods",
     vocab=PTMS_ALPHABET,
@@ -50,11 +50,14 @@ rt_data = FragmentIonIntensityDataset(
     batch_size=2048
 )
 
-import wandb
-from wandb.keras import WandbCallback
+print(type(rt_data.tensor_train_data))
+print(type(rt_data.tensor_val_data))
 
-wandb.login(key='d6d86094362249082238642ed3a0380fde08761c')
-wandb.init(project='astral', entity='elizabeth-lochert-flx')
+#import wandb
+#from wandb.keras import WandbCallback
+#
+#wandb.login(key='d6d86094362249082238642ed3a0380fde08761c')
+#wandb.init(project='astral', entity='elizabeth-lochert-flx')
 
 #print(rt_data.dataset)
 
@@ -64,7 +67,25 @@ from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_d
 import tensorflow as tf
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-model = PrositIntensityPredictor(vocab_dict=PTMS_ALPHABET)
+
+#model = PrositIntensityPredictor(vocab_dict=PTMS_ALPHABET)
+
+from models.models import TransformerModel
+
+print("Loading Transformer Model")
+
+model = TransformerModel(
+    running_units=128, 
+    d=16,
+    depth=3,
+    ffn_mult=1, 
+    penultimate_units=512,
+    alphabet=False,
+    dropout=0.1,
+    prec_type='inject_pre',
+)
+
+print("Compiling Transformer Model")
 model.compile(optimizer='adam', 
             loss=masked_spectral_distance,
             metrics=[masked_pearson_correlation_distance])
@@ -97,7 +118,7 @@ model.fit(
     validation_data=rt_data.tensor_val_data,
     epochs=100,
     callbacks=[
-        WandbCallback(save_model=False),
+#        WandbCallback(save_model=False),
         cyclicLR,
         early_stopping,
         #save_best,
@@ -105,6 +126,6 @@ model.fit(
     ]
 )
 
-wandb.finish()
+#wandb.finish()
 
 #model.save('Prosit_cit/Intensity/')
