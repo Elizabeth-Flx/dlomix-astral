@@ -151,7 +151,7 @@ learningRate = LearningRateLogging()
 model.fit(
     rt_data.tensor_train_data,
     validation_data=rt_data.tensor_val_data,
-    epochs=3,
+    epochs=config['train_settings']['epochs'],
     callbacks=[
         WandbCallback(save_model=False),
         cyclicLR,

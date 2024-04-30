@@ -15,5 +15,8 @@ model_settings:
   prec_type: inject_pre     # embed_input | pretoken | inject_pre | inject_ffn
   inject_position: all      # all | pre | post
 
+train_settings:
+  epochs: 10
+
 
 
