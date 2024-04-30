@@ -39,20 +39,47 @@ PTMS_ALPHABET = {
     "N[UNIMOD:7]":3,
 }
 
+import yaml
 
 
+with open("./config.yaml", 'r') as yaml_file:
+    config = yaml.safe_load(yaml_file)
 
+print("DataLoader Settings:")
+print(f"Dataset: {config['dataloader']['dataset']}")
+print(f"Batch Size: {config['dataloader']['batch_size']}")
+print("\nModel config:")
+print(f"Running Units: {config['model_settings']['running_units']}")
+print(f"d: {config['model_settings']['d']}")
+print(f"Depth: {config['model_settings']['depth']}")
+print(f"FFN Multiplier: {config['model_settings']['ffn_mult']}")
+print(f"Penultimate Units: {config['model_settings']['penultimate_units']}")
+print(f"Alphabet: {config['model_settings']['alphabet']}")
+print(f"Dropout: {config['model_settings']['dropout']}")
+print(f"Prec Type: {config['model_settings']['prec_type']}")
+print(f"Inject Position: {config['model_settings']['inject_position']}")
+
+
+match config['dataloader']['dataset']:
+    case 'small':
+        train_data_source = "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_train.parquet"
+        val_data_source =   "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_val.parquet"
+        test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_test.parquet"
+    case 'full':
+        train_data_source = "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_train.parquet"
+        val_data_source =   "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_val.parquet"
+        test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_test.parquet"
 
 
 rt_data = FragmentIonIntensityDataset(
-    data_source="/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_train.parquet",
-    val_data_source="/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_val.parquet",
-    test_data_source="/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_test.parquet",
+    data_source=train_data_source,
+    val_data_source=val_data_source,
+    test_data_source=test_data_source,
     data_format="parquet", 
     val_ratio=0.2, max_seq_len=30, encoding_scheme="naive-mods",
     vocab=PTMS_ALPHABET,
     model_features=["precursor_charge_onehot", "collision_energy_aligned_normed","method_nbr"],
-    batch_size=2048
+    batch_size=config['dataloader']['batch_size']
 )
 
 print(type(rt_data.tensor_train_data))
@@ -79,16 +106,18 @@ from models.models import TransformerModel
 
 print("Loading Transformer Model")
 
+model_settings = config['model_settings']
+
 model = TransformerModel(
-    running_units=128, 
-    d=16,
-    depth=3,
-    ffn_mult=1, 
-    penultimate_units=512,
+    running_units=model_settings['running_units'], 
+    d=model_settings['d'],
+    depth=model_settings['depth'],
+    ffn_mult=model_settings['ffn_mult'], 
+    penultimate_units=model_settings['penultimate_units'],
     alphabet=False,
     dropout=0.1,
-    prec_type='inject_pre',     # embed_input | pretoken | inject_pre | inject_ffn
-    inject_position="all"       # all | pre | post (only for inject_pre and inject_ffn)
+    prec_type=model_settings['prec_type'],              # embed_input | pretoken | inject_pre | inject_ffn
+    inject_position=model_settings['inject_position']   # all | pre | post (only for inject_pre and inject_ffn)
 )
 
 print("Compiling Transformer Model")
