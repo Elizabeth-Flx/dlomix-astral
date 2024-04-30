@@ -68,7 +68,9 @@ class TransformerModel(K.Model):
         self.alpha_pos = tf.Variable(0.1, trainable=True)
         
         # Beginning
-        self.string_lookup = preprocessing.StringLookup(vocabulary=list(ALPHABET_UNMOD.keys()))
+        #self.string_lookup = preprocessing.StringLookup(vocabulary=list(ALPHABET_UNMOD.keys()))
+        #self.string_lookup.build(None, 30)
+        
         #self.embedding = L.Embedding(len(ALPHABET_UNMOD), running_units, input_length=sequence_length)
         self.first = L.Dense(running_units)
         if prec_type in ['pretoken', 'inject_pre', 'inject_ffn']:
@@ -110,8 +112,10 @@ class TransformerModel(K.Model):
         self.final = L.Dense(output_units, activation='sigmoid')
 
     def EmbedInputs(self, sequence, precursor_charge, collision_energy):
+        #print(sequence)
         length = sequence.shape[1]
-        input_embedding = tf.one_hot(self.string_lookup(sequence), len(ALPHABET_UNMOD))
+        #input_embedding = tf.one_hot(self.string_lookup(sequence), len(ALPHABET_UNMOD))
+        input_embedding = tf.one_hot(int(sequence), len(ALPHABET_UNMOD))
         if self.prec_type == 'embed_input':
             charge_emb = tf.tile(precursor_charge[:,None], [1, length, 1])
             ce_emb = tf.tile(collision_energy[:,None], [1, length, 1])
@@ -135,20 +139,29 @@ class TransformerModel(K.Model):
 
     def call(self, x, training=False):
 
+        sequence = x['modified_sequence']
+        precchar = x['precursor_charge_onehot']
+        collener = x['collision_energy_aligned_normed']
+
+        #print(sequence.get_shape())
+
         #out = self.EmbedInputs(x['sequence'], x['precursor_charge'], x['collision_energy'])
-        out = self.EmbedInputs(x['_parsed_sequence'], x['precursor_charge_onehot'], x['collision_energy_aligned_normed'])
+        out = self.EmbedInputs(sequence, precchar, collener)
 
         out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]
         tb_emb = None
+
         if self.prec_type == 'pretoken': 
-            charge_ce_token = self.charge_embedder(x['precursor_charge']) + self.ce_embedder(x['collision_energy'])
+            charge_ce_token = self.charge_embedder(precchar) + self.ce_embedder(collener)
             out = tf.concat([charge_ce_token[:,None], out], axis=1)
+
         elif self.prec_type in ['inject_pre', 'inject_ffn']:    # if chosen inject into transformer blocks
             charge_ce_embedding = tf.concat([
-                self.charge_embedder(x['precursor_charge']),
-                self.ce_embedder(x['collision_energy'])
-            ], axis=-1)
+                self.charge_embedder(precchar),     # (bs, running_units)
+                self.ce_embedder(collener)          # (bs, running_units)
+            ], axis=-1)                             # (bs, 2*running_units)
             tb_emb = tf.nn.silu(charge_ce_embedding)
+
         out = self.Main(out, tb_emb=tb_emb)     # Transformer blocks
         out = self.penultimate(out)
         out = self.final(out)

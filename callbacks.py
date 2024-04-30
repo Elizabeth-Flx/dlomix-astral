@@ -1,5 +1,6 @@
 from tensorflow.keras.callbacks import *
 import tensorflow.keras.backend as K
+import numpy as np
 
 
 class CyclicLR(Callback):

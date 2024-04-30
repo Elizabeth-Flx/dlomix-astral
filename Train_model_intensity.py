@@ -39,6 +39,11 @@ PTMS_ALPHABET = {
     "N[UNIMOD:7]":3,
 }
 
+
+
+
+
+
 rt_data = FragmentIonIntensityDataset(
     data_source="/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_train.parquet",
     val_data_source="/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_val.parquet",
@@ -53,11 +58,11 @@ rt_data = FragmentIonIntensityDataset(
 print(type(rt_data.tensor_train_data))
 print(type(rt_data.tensor_val_data))
 
-#import wandb
-#from wandb.keras import WandbCallback
-#
-#wandb.login(key='d6d86094362249082238642ed3a0380fde08761c')
-#wandb.init(project='astral', entity='elizabeth-lochert-flx')
+import wandb
+from wandb.keras import WandbCallback
+
+wandb.login(key='d6d86094362249082238642ed3a0380fde08761c')
+wandb.init(project='astral', entity='elizabeth-lochert-flx')
 
 #print(rt_data.dataset)
 
@@ -82,7 +87,8 @@ model = TransformerModel(
     penultimate_units=512,
     alphabet=False,
     dropout=0.1,
-    prec_type='inject_pre',
+    prec_type='inject_pre',     # embed_input | pretoken | inject_pre | inject_ffn
+    inject_position="all"       # all | pre | post (only for inject_pre and inject_ffn)
 )
 
 print("Compiling Transformer Model")
@@ -116,9 +122,9 @@ learningRate = LearningRateLogging()
 model.fit(
     rt_data.tensor_train_data,
     validation_data=rt_data.tensor_val_data,
-    epochs=100,
+    epochs=3,
     callbacks=[
-#        WandbCallback(save_model=False),
+        WandbCallback(save_model=False),
         cyclicLR,
         early_stopping,
         #save_best,
@@ -126,6 +132,8 @@ model.fit(
     ]
 )
 
-#wandb.finish()
+print(model.summary())
+
+wandb.finish()
 
 #model.save('Prosit_cit/Intensity/')
