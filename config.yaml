@@ -1,0 +1,22 @@
+# large or small dataset
+
+dataloader:
+  dataset: full      # full | small
+  batch_size: 2048    # default 2048
+
+model_settings:
+  running_units: 128
+  d: 16
+  depth: 3
+  ffn_mult: 1
+  penultimate_units: 512
+  alphabet: False
+  dropout: False
+  prec_type: inject_pre     # embed_input | pretoken | inject_pre | inject_ffn
+  inject_position: all      # all | pre | post
+
+train_settings:
+  epochs: 10
+
+
+
