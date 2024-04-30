@@ -9,7 +9,21 @@ from dlomix.data import FragmentIonIntensityDataset
 import pandas as pd
 
 from datasets import disable_caching
-disable_caching()
+#disable_caching()
+
+import tensorflow as tf
+print('='*32)
+print('Conda info')
+print(f"Environment: {os.environ['CONDA_DEFAULT_ENV']}")
+print('='*32)
+print('Tensorflow info')
+print(f"Version: {tf.__version__}")
+print(f"Built with CUDA: {tf.test.is_built_with_cuda()}")
+print(f"Number of GPUs available: {len(tf.config.list_physical_devices('GPU'))}")
+print(f"List of GPUs available: {tf.config.list_physical_devices('GPU')}")
+print('='*32)
+
+
 
 PTMS_ALPHABET = {
     "A": 1,
@@ -48,6 +62,7 @@ with open("./config.yaml", 'r') as yaml_file:
 print("DataLoader Settings:")
 print(f"Dataset: {config['dataloader']['dataset']}")
 print(f"Batch Size: {config['dataloader']['batch_size']}")
+
 print("\nModel config:")
 print(f"Running Units: {config['model_settings']['running_units']}")
 print(f"d: {config['model_settings']['d']}")
@@ -58,6 +73,9 @@ print(f"Alphabet: {config['model_settings']['alphabet']}")
 print(f"Dropout: {config['model_settings']['dropout']}")
 print(f"Prec Type: {config['model_settings']['prec_type']}")
 print(f"Inject Position: {config['model_settings']['inject_position']}")
+
+print("\nTraining Settings:")
+print(f"Epochs: {config['train_settings']['epochs']}")
 
 
 match config['dataloader']['dataset']:
@@ -154,10 +172,10 @@ model.fit(
     epochs=config['train_settings']['epochs'],
     callbacks=[
         WandbCallback(save_model=False),
-        cyclicLR,
-        early_stopping,
+        #cyclicLR,
+        #early_stopping,
         #save_best,
-        learningRate
+        #learningRate
     ]
 )
 

@@ -16,7 +16,7 @@ model_settings:
   inject_position: all      # all | pre | post
 
 train_settings:
-  epochs: 10
+  epochs: 100
 
 
 
