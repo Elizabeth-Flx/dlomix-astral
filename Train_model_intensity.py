@@ -64,15 +64,8 @@ print(f"Dataset: {config['dataloader']['dataset']}")
 print(f"Batch Size: {config['dataloader']['batch_size']}")
 
 print("\nModel config:")
-print(f"Running Units: {config['model_settings']['running_units']}")
-print(f"d: {config['model_settings']['d']}")
-print(f"Depth: {config['model_settings']['depth']}")
-print(f"FFN Multiplier: {config['model_settings']['ffn_mult']}")
-print(f"Penultimate Units: {config['model_settings']['penultimate_units']}")
-print(f"Alphabet: {config['model_settings']['alphabet']}")
-print(f"Dropout: {config['model_settings']['dropout']}")
-print(f"Prec Type: {config['model_settings']['prec_type']}")
-print(f"Inject Position: {config['model_settings']['inject_position']}")
+for key, value in config['model_settings'].items():
+    print(f"{key}: {value}")
 
 print("\nTraining Settings:")
 print(f"Epochs: {config['train_settings']['epochs']}")
@@ -126,17 +119,7 @@ print("Loading Transformer Model")
 
 model_settings = config['model_settings']
 
-model = TransformerModel(
-    running_units=model_settings['running_units'], 
-    d=model_settings['d'],
-    depth=model_settings['depth'],
-    ffn_mult=model_settings['ffn_mult'], 
-    penultimate_units=model_settings['penultimate_units'],
-    alphabet=False,
-    dropout=0.1,
-    prec_type=model_settings['prec_type'],              # embed_input | pretoken | inject_pre | inject_ffn
-    inject_position=model_settings['inject_position']   # all | pre | post (only for inject_pre and inject_ffn)
-)
+model = TransformerModel(**model_settings)
 
 print("Compiling Transformer Model")
 model.compile(optimizer='adam', 

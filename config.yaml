@@ -11,12 +11,16 @@ model_settings:
   ffn_mult: 1
   penultimate_units: 512
   alphabet: False
-  dropout: False
+  dropout: 0.1
   prec_type: inject_pre     # embed_input | pretoken | inject_pre | inject_ffn
-  inject_position: all      # all | pre | post
+  inject_pre: False          # inject before Attention block
+  inject_post: True         # inject into FFN
+  inject_position: all      # all | first | last
+
+
 
 train_settings:
-  epochs: 100
+  epochs: 1
 
 
 
