@@ -6,9 +6,9 @@
 #SBATCH -D ./
 #SBATCH --get-user-env
 
-#SBATCH --partition=shared-gpu # compms-cpu-small | shared-gpu
+#SBATCH --partition=shared-gpu          # compms-cpu-small | shared-gpu
 #SBATCH --nodes=1
-#SBATCH --gpus-per-node=1
+#SBATCH --gpus-per-node=2
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=100G
 #SBATCH --tasks-per-node=1
@@ -25,5 +25,8 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate astral
 export HF_DATASETS_CACHE="/cmnfs/proj/prosit_astral"
 export HF_DATASETS_CACHE="/cmnfs/proj/prosit_astral/datasets"
+
+export HF_HOME='/cmnfs/proj/prosit/ptms/huggingface'
+export HF_DATASETS_CACHE='/cmnfs/proj/prosit/ptms/huggingface/datasets'
 
 python -u Train_model_intensity.py &> logs/logger$1.log

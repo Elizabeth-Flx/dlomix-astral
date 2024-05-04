@@ -257,6 +257,7 @@ class TransBlock(L.Layer):
                  prenorm=True,
                  use_embed=False,
                  preembed=True,
+                 postembed=True,
                  is_cross=False
     ):
         super(TransBlock, self).__init__()
@@ -265,6 +266,7 @@ class TransBlock(L.Layer):
         self.prenorm = prenorm
         self.use_embed = use_embed
         self.preembed = preembed
+        self.postebmed = postembed
         self.is_cross = is_cross
         
         if preembed: self.alpha = tf.Variable(0.1, trainable=True)
@@ -287,7 +289,7 @@ class TransBlock(L.Layer):
         selfmask = seq_mask if self.is_cross else spec_mask
         Temb = self.embed(temb)[:,None,:] if self.use_embed else 0
         
-        out = x + self.alpha*Temb if self.preembed else x
+        out = x + self.alpha*Temb if self.preembed else x           # alpha used as "gate"
         out = self.norm1(out) if self.prenorm else out
         out = self.selfattention(out, mask=selfmask)
         if self.is_cross:
@@ -295,7 +297,7 @@ class TransBlock(L.Layer):
             out = self.crossattention(out, kv_feats, spec_mask)
             out = out if self.prenorm else self.crossnorm(out)
         out = self.norm2(out) if self.prenorm else self.norm1(out)
-        out = self.ffn(out, None) if self.preembed else self.ffn(out, Temb)
+        out = self.ffn(out, Temb) if self.postebmed else self.ffn(out, None)
         out = out if self.prenorm else self.norm2(out)
         
         return out
@@ -315,7 +317,7 @@ class ResBlock(L.Layer):
         self.conv1 = L.Conv1D(out_channels, ks, strides=1, padding='same', use_bias=False)
         self.norm1 = L.BatchNormalization()
         self.act = tf.nn.relu
-        self.conv2 = nn.Conv1D(out_channels, ks, strides1, padding='same', use_bias=False)
+        self.conv2 = nn.Conv1D(out_channels, ks, strides=1, padding='same', use_bias=False)
         self.norm2 = nn.BatchNormalization()
         self.shortcut = L.Conv1D(out_channels, 1, strides=1, padding='same') if inch != out_channels else A.linear
 
