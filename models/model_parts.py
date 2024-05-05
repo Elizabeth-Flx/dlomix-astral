@@ -266,7 +266,7 @@ class TransBlock(L.Layer):
         self.prenorm = prenorm
         self.use_embed = use_embed
         self.preembed = preembed
-        self.postebmed = postembed
+        self.postembed = postembed
         self.is_cross = is_cross
         
         if preembed: self.alpha = tf.Variable(0.1, trainable=True)
@@ -297,7 +297,7 @@ class TransBlock(L.Layer):
             out = self.crossattention(out, kv_feats, spec_mask)
             out = out if self.prenorm else self.crossnorm(out)
         out = self.norm2(out) if self.prenorm else self.norm1(out)
-        out = self.ffn(out, Temb) if self.postebmed else self.ffn(out, None)
+        out = self.ffn(out, Temb) if self.postembed else self.ffn(out, None)
         out = out if self.prenorm else self.norm2(out)
         
         return out

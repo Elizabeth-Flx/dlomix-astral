@@ -15,7 +15,7 @@ model_settings:
   prec_type: inject_pre     # embed_input | pretoken | inject_pre | inject_ffn
   inject_pre: False          # inject before Attention block
   inject_post: True         # inject into FFN
-  inject_position: all      # all | first | last
+  inject_position: last      # all | first | last
 
 
 

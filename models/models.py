@@ -100,12 +100,16 @@ class TransformerModel(K.Model):
                 ffn_dict, 
                 prenorm=prenorm, 
                 norm_type=norm_type, 
-                use_embed=True if prec_type=='inject' else False,     # Creates self.embed in model_parts which is used to integrate metadata into model
-                preembed=True if inject_pre and prec_type=='inject' else False,
-                postembed=True if inject_post and prec_type=='inject' else False,
+                use_embed=True if   (prec_type=='inject') and
+                                    (inject_position == 'all' or
+                                     inject_position == 'first' and i == 0 or
+                                     inject_position == 'last' and i == depth-1) else False,     # Creates self.embed in model_parts which is used to integrate metadata into model
+                preembed=inject_pre,
+                postembed=inject_post,
                 is_cross=False
             )
-            for _ in range(depth)
+            
+            for i in range(depth)
         ]
 
         # End

@@ -70,6 +70,8 @@ for key, value in config['model_settings'].items():
 print("\nTraining Settings:")
 print(f"Epochs: {config['train_settings']['epochs']}")
 
+print('='*32)
+
 
 match config['dataloader']['dataset']:
     case 'small':
@@ -93,8 +95,8 @@ rt_data = FragmentIonIntensityDataset(
     batch_size=config['dataloader']['batch_size']
 )
 
-print(type(rt_data.tensor_train_data))
-print(type(rt_data.tensor_val_data))
+#print(type(rt_data.tensor_train_data))
+#print(type(rt_data.tensor_val_data))
 
 import wandb
 from wandb.keras import WandbCallback
