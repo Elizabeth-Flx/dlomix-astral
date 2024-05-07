@@ -121,6 +121,9 @@ print("Loading Transformer Model")
 
 model_settings = config['model_settings']
 
+if model_settings['prec_type'] not in ['embed_input', 'pretoken', 'inject']:
+    raise ValueError("Invalid model setting for 'prec_type'")
+
 model = TransformerModel(**model_settings)
 
 print("Compiling Transformer Model")
@@ -150,6 +153,12 @@ early_stopping = EarlyStopping(
 )"""
 
 learningRate = LearningRateLogging()
+
+wandb.init(
+    project="astral",
+    name="inject_testing",
+    config=config  # assuming you have a config dictionary containing hyperparameters
+)
 
 model.fit(
     rt_data.tensor_train_data,

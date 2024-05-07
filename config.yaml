@@ -7,20 +7,20 @@ dataloader:
 model_settings:
   running_units: 128
   d: 16
-  depth: 3
+  depth: 10
   ffn_mult: 1
   penultimate_units: 512
   alphabet: False
   dropout: 0.1
-  prec_type: inject_pre     # embed_input | pretoken | inject_pre | inject_ffn
-  inject_pre: False          # inject before Attention block
+  prec_type: inject        # embed_input | pretoken | inject
+  inject_pre: True          # inject before Attention block
   inject_post: True         # inject into FFN
-  inject_position: last      # all | first | last
+  inject_position: first      # all | first | last | none
 
 
 
 train_settings:
-  epochs: 1
+  epochs: 3
 
 
 
