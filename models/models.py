@@ -127,9 +127,16 @@ class TransformerModel(K.Model):
         #input_embedding = tf.one_hot(self.string_lookup(sequence), len(ALPHABET_UNMOD))
         input_embedding = tf.one_hot(int(sequence), len(ALPHABET_UNMOD))
         if self.prec_type == 'embed_input':
-            charge_emb = tf.tile(precursor_charge[:,None], [1, length, 1])
-            ce_emb = tf.tile(collision_energy[:,None], [1, length, 1])
-            input_embedding = tf.concat([input_embedding, charge_emb, ce_emb], axis=-1)
+            #print(precursor_charge.shape)
+            #print(precursor_charge[:,None].shape)
+            charge_emb = tf.tile(precursor_charge[:,None], [1, length, 1])          # (bs, 1, 6)
+            #print(charge_emb.shape)
+            #print(collision_energy.shape)
+            #print(collision_energy[:,None][:,None].shape)
+            ce_emb = tf.tile(collision_energy[:,None][:,None], [1, length, 1])      # (bs, 1, 1)
+            #print(ce_emb.shape)
+
+            input_embedding = tf.concat([input_embedding, tf.cast(charge_emb, tf.float32), ce_emb], axis=-1)
         
         return input_embedding
 

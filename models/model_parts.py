@@ -274,6 +274,8 @@ class TransBlock(L.Layer):
         
         self.norm1 = norm()
         self.norm2 = norm()
+
+        
         self.selfattention = SelfAttention(**attention_dict)
         if is_cross:
             self.crossnorm = norm()

@@ -56,20 +56,23 @@ PTMS_ALPHABET = {
 import yaml
 
 
-with open("./config.yaml", 'r') as yaml_file:
+with open("/nfs/home/students/d.lochert/projects/astral/dlomix/my_scripts/config.yaml", 'r') as yaml_file:
     config = yaml.safe_load(yaml_file)
+
+model_settings = config['model_settings']
+train_settings = config['train_settings']
 
 print("DataLoader Settings:")
 print(f"Dataset: {config['dataloader']['dataset']}")
 print(f"Batch Size: {config['dataloader']['batch_size']}")
 
 print("\nModel config:")
-for key, value in config['model_settings'].items():
+for key, value in model_settings.items():
     print(f"{key}: {value}")
 
 print("\nTraining Settings:")
-print(f"Epochs: {config['train_settings']['epochs']}")
-
+for key, value in train_settings.items():
+    print(f"{key}: {value}")
 print('='*32)
 
 
@@ -102,7 +105,7 @@ import wandb
 from wandb.keras import WandbCallback
 
 wandb.login(key='d6d86094362249082238642ed3a0380fde08761c')
-wandb.init(project='astral', entity='elizabeth-lochert-flx')
+#wandb.init(project='astral', entity='elizabeth-lochert-flx')
 
 #print(rt_data.dataset)
 
@@ -111,7 +114,7 @@ from dlomix.constants import PTMS_ALPHABET
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
 import tensorflow as tf
 
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+optimizer = tf.keras.optimizers.Adam(learning_rate=train_settings['lr_base'])
 
 #model = PrositIntensityPredictor(vocab_dict=PTMS_ALPHABET)
 
@@ -119,23 +122,29 @@ from models.models import TransformerModel
 
 print("Loading Transformer Model")
 
-model_settings = config['model_settings']
-
 if model_settings['prec_type'] not in ['embed_input', 'pretoken', 'inject']:
     raise ValueError("Invalid model setting for 'prec_type'")
 
 model = TransformerModel(**model_settings)
 
 print("Compiling Transformer Model")
-model.compile(optimizer='adam', 
+model.compile(optimizer=optimizer, 
             loss=masked_spectral_distance,
             metrics=[masked_pearson_correlation_distance])
+
+
+# Callbacks
 
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from callbacks import CyclicLR, LearningRateLogging
 
-cyclicLR = CyclicLR(base_lr=0.000001, max_lr=0.0002, step_size=2, mode='triangular',
-                 gamma=0.95)
+cyclicLR = CyclicLR(
+    base_lr=train_settings['lr_base'],
+    max_lr=train_settings['lr_max'],
+    step_size=2,
+    mode='triangular',
+    gamma=0.95
+)
 
 early_stopping = EarlyStopping(
     monitor="val_loss",
@@ -154,23 +163,70 @@ early_stopping = EarlyStopping(
 
 learningRate = LearningRateLogging()
 
-wandb.init(
-    project="astral",
-    name="inject_testing",
-    config=config  # assuming you have a config dictionary containing hyperparameters
+
+
+# Wandb init
+
+import random  
+from string import ascii_lowercase, ascii_uppercase, digits
+chars = ascii_lowercase + ascii_uppercase + digits
+
+#name =  config['dataloader']['dataset'][0] + '_' + \
+#        model_settings['prec_type'] + '_' + \
+#        (str(model_settings['inject_pre'])[0] +  
+#        str(model_settings['inject_post'])[0] +
+#        model_settings['inject_position'] + '_') \
+#            if model_settings['prec_type']=='inject' else "" + \
+#        'd' + str(model_settings['depth']) + '_' + \
+#        train_settings['lr_method'] + '_' + \
+#        ''.join([random.choice(chars) for _ in range(3)])
+
+name = f"%s_%s%s_d%s_%s_%s_%s" % ( 
+    config['dataloader']['dataset'][0],
+    model_settings['prec_type'],
+    (str(model_settings['inject_pre'])[0] +  str(model_settings['inject_post'])[0] + model_settings['inject_position'])
+        if model_settings['prec_type']=='inject' else "",
+    model_settings['depth'],
+    train_settings['lr_method'],
+    train_settings['lr_base'],
+    ''.join([random.choice(chars) for _ in range(3)])
 )
+
+
+tags = [
+    config['dataloader']['dataset'],
+    'depth_' + str(model_settings['depth']),
+    'prec_type_' + model_settings['prec_type'],
+    'lr_method_' + train_settings['lr_method'],
+    'lr_base_' + str(train_settings['lr_base']),
+    'lr_max_' + str(train_settings['lr_max']),
+]
+tags + [model_settings['inject_pre'], 
+        model_settings['inject_post'], 
+        model_settings['inject_position']] if model_settings['prec_type'] == 'inject' else []
+
+wandb.init(
+    project="lr_testing",
+    name=name,
+    tags=tags,
+    config=config,
+    entity='elizabeth-lochert-flx'
+)
+
+callbacks = [
+    WandbCallback(save_model=False),
+    #early_stopping,
+    learningRate
+]
+
+if train_settings['lr_method'] == 'cyclic':
+    callbacks.append(cyclicLR)
 
 model.fit(
     rt_data.tensor_train_data,
     validation_data=rt_data.tensor_val_data,
-    epochs=config['train_settings']['epochs'],
-    callbacks=[
-        WandbCallback(save_model=False),
-        #cyclicLR,
-        #early_stopping,
-        #save_best,
-        #learningRate
-    ]
+    epochs=train_settings['epochs'],
+    callbacks=callbacks
 )
 
 print(model.summary())
