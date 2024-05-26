@@ -40,10 +40,10 @@ class TransformerModel(K.Model):
         ffn_mult=1,
         depth=3,
         pos_type='learned', # learned
-        prec_type="embed_input", # embed_input | pretoken | inject
+        integration_method="embed_input", # embed_input | pretoken | inject
         learned_pos=True,
-        prenorm=False,
-        norm_type="layer",
+        prenorm=True,
+        norm_type="layer",      # layer | batch | adaptive
         penultimate_units=None,
         output_units=174,
         max_charge=6,
@@ -53,18 +53,22 @@ class TransformerModel(K.Model):
         precursor_units=None,
         inject_pre=True,        # inject before Attention block
         inject_post=True,       # inject into FNN
-        inject_position="all"   # all | first | last
+        inject_position="all",  # all | first | last
+        seed=42
     ):
+        tf.random.set_seed(seed)
+
         super(TransformerModel, self).__init__()
         self.ru = running_units
         self.depth = depth
-        self.prec_type = prec_type
+        self.integration_method = integration_method
         self.prec_units = running_units if precursor_units == None else precursor_units
 
         self.inject_pre = inject_pre 
         self.inject_post = inject_post
         self.inject_position = inject_position
-        
+
+
         # Positional
         if learned_pos:
             self.pos = tf.Variable(tf.random.normal((sequence_length, running_units)), trainable=True)
@@ -78,10 +82,11 @@ class TransformerModel(K.Model):
         
         #self.embedding = L.Embedding(len(ALPHABET_UNMOD), running_units, input_length=sequence_length)
         self.first = L.Dense(running_units)
-        if prec_type in ['pretoken', 'inject']:
+        if integration_method in ['pretoken', 'inject', 'adaptive']:
             self.charge_embedder = L.Dense(running_units) #mp.PrecursorToken(running_units, 64, 1, 15)
             self.ce_embedder = mp.PrecursorToken(running_units, running_units, 0.01, 1.5)
-        
+    
+
         # Middle
         attention_dict = {
             'd': d,
@@ -99,14 +104,15 @@ class TransformerModel(K.Model):
                 attention_dict, 
                 ffn_dict, 
                 prenorm=prenorm, 
-                norm_type=norm_type, 
-                use_embed=True if   (prec_type=='inject') and
+                norm_type=norm_type,    # layer | batch | adaptive
+                use_embed=True if   (integration_method=='inject') and
                                     (inject_position == 'all' or
                                      inject_position == 'first' and i == 0 or
                                      inject_position == 'last' and i == depth-1) else False,     # Creates self.embed in model_parts which is used to integrate metadata into model
                 preembed=inject_pre,
                 postembed=inject_post,
-                is_cross=False
+                is_cross=False,
+                seed=seed
             )
             
             for i in range(depth)
@@ -116,7 +122,8 @@ class TransformerModel(K.Model):
         penultimate_units = running_units if penultimate_units is None else penultimate_units
         self.penultimate = K.Sequential([
             L.Dense(penultimate_units),
-            L.BatchNormalization(),
+            #L.BatchNormalization(),
+            L.LayerNormalization(),
             L.ReLU()
         ])
         self.final = L.Dense(output_units, activation='sigmoid')
@@ -125,8 +132,8 @@ class TransformerModel(K.Model):
         #print(sequence)
         length = sequence.shape[1]
         #input_embedding = tf.one_hot(self.string_lookup(sequence), len(ALPHABET_UNMOD))
-        input_embedding = tf.one_hot(int(sequence), len(ALPHABET_UNMOD))
-        if self.prec_type == 'embed_input':
+        input_embedding = tf.one_hot(tf.cast(sequence, tf.int32), len(ALPHABET_UNMOD))
+        if self.integration_method == 'embed_input':
             #print(precursor_charge.shape)
             #print(precursor_charge[:,None].shape)
             charge_emb = tf.tile(precursor_charge[:,None], [1, length, 1])          # (bs, 1, 6)
@@ -166,13 +173,14 @@ class TransformerModel(K.Model):
         out = self.EmbedInputs(sequence, precchar, collener)
 
         out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]
+
         tb_emb = None
 
-        if self.prec_type == 'pretoken': 
+        if self.integration_method == 'pretoken': 
             charge_ce_token = self.charge_embedder(precchar) + self.ce_embedder(collener)
             out = tf.concat([charge_ce_token[:,None], out], axis=1)
 
-        elif self.prec_type in ['inject']:    # if chosen inject into transformer blocks
+        elif self.integration_method in ['inject', 'adaptive']:    # if chosen inject into transformer blocks
             charge_ce_embedding = tf.concat([
                 self.charge_embedder(precchar),     # (bs, running_units)
                 self.ce_embedder(collener)          # (bs, running_units)

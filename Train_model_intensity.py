@@ -98,17 +98,6 @@ rt_data = FragmentIonIntensityDataset(
     batch_size=config['dataloader']['batch_size']
 )
 
-#print(type(rt_data.tensor_train_data))
-#print(type(rt_data.tensor_val_data))
-
-import wandb
-from wandb.keras import WandbCallback
-
-wandb.login(key='d6d86094362249082238642ed3a0380fde08761c')
-#wandb.init(project='astral', entity='elizabeth-lochert-flx')
-
-#print(rt_data.dataset)
-
 from dlomix.models import PrositIntensityPredictor
 from dlomix.constants import PTMS_ALPHABET
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
@@ -120,17 +109,65 @@ optimizer = tf.keras.optimizers.Adam(learning_rate=train_settings['lr_base'])
 
 from models.models import TransformerModel
 
-print("Loading Transformer Model")
+print("Loading Tansformer Model")
 
-if model_settings['prec_type'] not in ['embed_input', 'pretoken', 'inject']:
-    raise ValueError("Invalid model setting for 'prec_type'")
+#if model_settings['prec_type'] not in ['embed_input', 'pretoken', 'inject']:
+#    raise ValueError("Invalid model setting for 'prec_type'")
 
-model = TransformerModel(**model_settings)
+model = TransformerModel(**model_settings, seed=train_settings['seed'])
 
 print("Compiling Transformer Model")
 model.compile(optimizer=optimizer, 
             loss=masked_spectral_distance,
             metrics=[masked_pearson_correlation_distance])
+inp = [m for m in rt_data.tensor_train_data.take(1)][0][0]
+out = model(inp)
+model.summary()
+
+
+# Wandb init
+
+import wandb
+WandbCallback  = wandb.keras.WandbCallback
+from wandb.keras import WandbCallback
+
+wandb.login(key='d6d86094362249082238642ed3a0380fde08761c')
+
+import random  
+from string import ascii_lowercase, ascii_uppercase, digits
+chars = ascii_lowercase + ascii_uppercase + digits
+
+name = f"%s_%s%s_d%s_%s_%s_%s" % ( 
+    config['dataloader']['dataset'][0],
+    model_settings['integration_method'],
+    (str(model_settings['inject_pre'])[0] +  str(model_settings['inject_post'])[0] + model_settings['inject_position'])
+        if model_settings['integration_method']=='inject' else "",
+    model_settings['depth'],
+    train_settings['lr_method'],
+    train_settings['lr_base'],
+    ''.join([random.choice(chars) for _ in range(3)])
+)
+
+tags = [
+    config['dataloader']['dataset'],
+    'depth_' + str(model_settings['depth']),
+    'int_method_' + model_settings['integration_method'],
+    'lr_method_' + train_settings['lr_method'],
+    'lr_base_' + str(train_settings['lr_base']),
+    'lr_max_' + str(train_settings['lr_max']),
+]
+tags + [model_settings['inject_pre'], 
+        model_settings['inject_post'], 
+        model_settings['inject_position']] if model_settings['integration_method'] == 'inject' else []
+
+if train_settings['log_wandb']:
+    wandb.init(
+        project="lr_testing",
+        name=name,
+        tags=tags,
+        config=config,
+        entity='elizabeth-lochert-flx'
+    )
 
 
 # Callbacks
@@ -146,11 +183,45 @@ cyclicLR = CyclicLR(
     gamma=0.95
 )
 
+class WarmupCooldownLR(tf.keras.callbacks.Callback):
+    def __init__(self, 
+        start_lr, end_lr, step_start, step_end
+    ):
+        self.start_lr = start_lr
+        self.end_lr = end_lr
+        self.steps = step_end-step_start
+        self.step_start = step_start
+        self.step_end = step_end
+
+        self.schedule = np.linspace(start_lr, end_lr, self.steps)
+
+    def on_train_batch_begin(self, batch, *args):
+        global_step = model.optimizer.variables[0].numpy()
+        if (global_step >= self.step_start) & (global_step < self.step_end):
+            self.model.optimizer._learning_rate.assign(self.schedule[batch])
+
 early_stopping = EarlyStopping(
     monitor="val_loss",
     min_delta=0.001,
     patience=20,
     restore_best_weights=True)
+
+
+class LearningRateReporter(tf.keras.callbacks.Callback):
+    def on_train_batch_end(self, batch, *args):
+        wandb.log({'learning_rate': self.model.optimizer._learning_rate.numpy()})
+    
+    
+callbacks = []
+if train_settings['log_wandb']:
+    callbacks.append(WandbCallback(save_model=False))
+    callbacks.append(LearningRateReporter())
+if train_settings['lr_method'] == 'cyclic':
+    callbacks.append(cyclicLR)
+elif train_settings['lr_method'] == 'dynamic':
+    callbacks.append(WarmupCooldownLR(1e-7, 1e-3, 10000))
+    callbacks.append(WarmupCooldownLR(1e-3, 1e-4, 40000, 100000))
+
 
 # ValueError: When using `save_weights_only=True` in `ModelCheckpoint`, the filepath provided must end in `.weights.h5` (Keras weights format). Received: filepath=saved_models/best_model_intensity_nan.keras
 """save_best = ModelCheckpoint(
@@ -163,64 +234,17 @@ early_stopping = EarlyStopping(
 
 learningRate = LearningRateLogging()
 
-
-
-# Wandb init
-
-import random  
-from string import ascii_lowercase, ascii_uppercase, digits
-chars = ascii_lowercase + ascii_uppercase + digits
-
-#name =  config['dataloader']['dataset'][0] + '_' + \
-#        model_settings['prec_type'] + '_' + \
-#        (str(model_settings['inject_pre'])[0] +  
-#        str(model_settings['inject_post'])[0] +
-#        model_settings['inject_position'] + '_') \
-#            if model_settings['prec_type']=='inject' else "" + \
-#        'd' + str(model_settings['depth']) + '_' + \
-#        train_settings['lr_method'] + '_' + \
-#        ''.join([random.choice(chars) for _ in range(3)])
-
-name = f"%s_%s%s_d%s_%s_%s_%s" % ( 
-    config['dataloader']['dataset'][0],
-    model_settings['prec_type'],
-    (str(model_settings['inject_pre'])[0] +  str(model_settings['inject_post'])[0] + model_settings['inject_position'])
-        if model_settings['prec_type']=='inject' else "",
-    model_settings['depth'],
-    train_settings['lr_method'],
-    train_settings['lr_base'],
-    ''.join([random.choice(chars) for _ in range(3)])
-)
-
-
-tags = [
-    config['dataloader']['dataset'],
-    'depth_' + str(model_settings['depth']),
-    'prec_type_' + model_settings['prec_type'],
-    'lr_method_' + train_settings['lr_method'],
-    'lr_base_' + str(train_settings['lr_base']),
-    'lr_max_' + str(train_settings['lr_max']),
-]
-tags + [model_settings['inject_pre'], 
-        model_settings['inject_post'], 
-        model_settings['inject_position']] if model_settings['prec_type'] == 'inject' else []
-
-wandb.init(
-    project="lr_testing",
-    name=name,
-    tags=tags,
-    config=config,
-    entity='elizabeth-lochert-flx'
-)
-
-callbacks = [
-    WandbCallback(save_model=False),
-    #early_stopping,
-    learningRate
-]
-
+callbacks = []
+if train_settings['log_wandb']:
+    callbacks.append(WandbCallback(save_model=False))
+    callbacks.append(LearningRateReporter())
 if train_settings['lr_method'] == 'cyclic':
     callbacks.append(cyclicLR)
+elif train_settings['lr_method'] == 'warmup':
+    for lr in train_settings['lr_dynamic']:
+        callbacks.append(WarmupCooldownLR(*lr))
+    #callbacks.append(WarmupCooldownLR(1e-7, 1e-3, 10000))
+    #callbacks.append(WarmupCooldownLR(1e-3, 1e-4, 40000, 100000))
 
 model.fit(
     rt_data.tensor_train_data,
@@ -229,8 +253,7 @@ model.fit(
     callbacks=callbacks
 )
 
-print(model.summary())
-
-wandb.finish()
+if train_settings['log_wandb']:
+    wandb.finish()
 
 #model.save('Prosit_cit/Intensity/')

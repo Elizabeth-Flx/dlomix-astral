@@ -1,29 +1,35 @@
 # large or small dataset
 
 dataloader:
-  dataset: full      # full | small
-  batch_size: 2048    # default 2048
+  dataset: small      # full | small
+  batch_size: 1024   # default 2048
 
 model_settings:
-  running_units: 128
-  d: 16
-  depth: 3
+  running_units: 256
+  d: 64
+  h: 6
+  depth: 6
   ffn_mult: 1
   penultimate_units: 512
   alphabet: False
   dropout: 0.1
-  prec_type: inject        # embed_input | pretoken | inject
+  integration_method: adaptive        # embed_input | pretoken | inject | adaptive
+  norm_type: adaptive               # layer | batch | adaptive
   inject_pre: True          # inject before Attention block
   inject_post: False         # inject into FFN
   inject_position: all      # all | first | last | none
+
   
 
 
 
 train_settings:
   epochs: 10
-  lr_method: static      # static | cyclic 
-  lr_base: 0.0001
+  lr_method: static      # static | cyclic | dynamic
+  lr_base: 0.0005
   lr_max: 0.001
-
-
+  log_wandb: True
+  lr_dynamic:
+    - [1e07, 1e-3, 0, 10_000]
+    - [1e-3, 1e-4, 100_000, 140_000]
+  seed: 42                             # doesnt quite work yet

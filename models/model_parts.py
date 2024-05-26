@@ -19,6 +19,9 @@ def get_norm_type(string):
         return L.LayerNormalization
     elif string=='batch':
         return L.BatchNormalization
+    elif string=='adaptive':
+        return AdaptiveNorm
+
 
 class QKVAttention(L.Layer):
     def __init__(self, heads, is_relpos=False, max_rel_dist=None):
@@ -98,6 +101,13 @@ class SelfAttention(L.Layer):
     def build(self, x):
         self.sl = x[1]
         self.out_units = x[-1] if self.out_units==None else self.out_units
+        
+        limit = np.sqrt(6 / (self.d + x[-1]))
+        self.qkv = L.Dense(
+            3*self.d*self.h, use_bias=False, 
+            kernel_initializer=I.RandomUniform(-limit, limit)
+        )
+        
         self.Wo = L.Dense(
             self.out_units, use_bias=False,
             kernel_initializer=I.RandomNormal(0, 0.3*(self.h*self.d)**-0.5)
@@ -253,13 +263,17 @@ class TransBlock(L.Layer):
     def __init__(self,
                  attention_dict,
                  ffn_dict,
-                 norm_type='layer', 
+                 norm_type='layer',     # layer | batch | adaptive
                  prenorm=True,
                  use_embed=False,
                  preembed=True,
                  postembed=True,
-                 is_cross=False
+                 is_cross=False,
+                 seed=42
     ):
+        tf.random.set_seed(seed)
+        np.random.seed(seed)
+        
         super(TransBlock, self).__init__()
         self.norm_type = norm_type
         self.mult = ffn_dict['unit_multiplier']
@@ -272,9 +286,8 @@ class TransBlock(L.Layer):
         if preembed: self.alpha = tf.Variable(0.1, trainable=True)
         norm = get_norm_type(norm_type)
         
-        self.norm1 = norm()
-        self.norm2 = norm()
-
+        self.norm1 = BaseNorm(norm())
+        self.norm2 = BaseNorm(norm())
         
         self.selfattention = SelfAttention(**attention_dict)
         if is_cross:
@@ -285,22 +298,27 @@ class TransBlock(L.Layer):
     def build(self, x):
         if self.use_embed:
             units = x[-1] if self.preembed else x[-1]*self.mult
-            self.embed = L.Dense(units*self.mult)
+            self.embed = L.Dense(units)
     
     def call(self, x, kv_feats=None, temb=None, spec_mask=None, seq_mask=None):
         selfmask = seq_mask if self.is_cross else spec_mask
-        Temb = self.embed(temb)[:,None,:] if self.use_embed else 0
+        Temb = self.embed(temb)[:,None,:] if self.use_embed else 0          # (bs, 1, ru)
         
         out = x + self.alpha*Temb if self.preembed else x           # alpha used as "gate"
-        out = self.norm1(out) if self.prenorm else out
+
+        out = self.norm1(out, temb) if self.prenorm else out
+
         out = self.selfattention(out, mask=selfmask)
         if self.is_cross:
             out = self.crossnorm(out) if self.prenorm else out
             out = self.crossattention(out, kv_feats, spec_mask)
             out = out if self.prenorm else self.crossnorm(out)
-        out = self.norm2(out) if self.prenorm else self.norm1(out)
+
+        out = self.norm2(out, temb) if self.prenorm else self.norm1(out, temb)
+
         out = self.ffn(out, Temb) if self.postembed else self.ffn(out, None)
-        out = out if self.prenorm else self.norm2(out)
+
+        out = out if self.prenorm else self.norm2(out, temb)
         
         return out
 
@@ -386,3 +404,40 @@ def FourierFeatures(t, min_lam, max_lam, embedsz):
     embed = t / denom[None]
 
     return tf.concat([tf.cos(embed), tf.sin(embed)], axis=-1)
+
+class AdaptiveNorm(L.Layer):
+
+    def __init__(self):
+        super(AdaptiveNorm, self).__init__()
+        self.norm = L.LayerNormalization()
+        self.norm.trainable = False
+        
+        
+    def build(self, x):
+        self.scalebias = L.Dense(2*x[-1], use_bias=False) 
+    
+    def call(self, x, metadata):
+        scalebias = self.scalebias(metadata)  # (bs, 2*ru)
+        scale, bias = tf.split(scalebias, 2, axis=-1) # 2 x (bs, ru)
+        
+        scale = scale[:,None]  # (bs, 1, ru)
+        bias = bias[:,None]    # (bs, 1, ru)
+        
+        out = self.norm(x)
+        out = (1 + scale) * out - bias 
+        
+        return out
+    
+class BaseNorm():
+
+    def __init__(self, norm):
+        #super(BaseNorm, self).__init__()
+        self.norm = norm
+
+    def __call__(self, x, metadata=None):
+        if isinstance(self.norm, AdaptiveNorm):
+            return self.norm(x, metadata)
+        else:
+            return self.norm(x)
+
+

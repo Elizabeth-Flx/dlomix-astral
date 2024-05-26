@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH -J astral
-#SBATCH -o %x.%A_%a.%N.out
-#SBATCH -e %x.%A_%a.%N.gerr
+#SBATCH -o logs/sbatch_out/%x.%A_%a.%N.out
+#SBATCH -e logs/sbatch_out/%x.%A_%a.%N.gerr
 #SBATCH -D ./
 #SBATCH --get-user-env
 
@@ -29,4 +29,4 @@ export HF_DATASETS_CACHE="/cmnfs/proj/prosit_astral/datasets"
 export HF_HOME='/cmnfs/proj/prosit/ptms/huggingface'
 export HF_DATASETS_CACHE='/cmnfs/proj/prosit/ptms/huggingface/datasets'
 
-python -u Train_model_intensity.py &> logs/logger$1.log
+python -u Train_model_intensity.py &> logs/$1.log
