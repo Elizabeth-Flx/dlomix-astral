@@ -80,13 +80,12 @@ class SelfAttention(L.Layer):
         self.out_units = out_units
         self.alphabet = alphabet
         
-        self.qkv = L.Dense(3*d*h, use_bias=False)
         self.attention_layer = QKVAttention(h)
         self.drop = L.Dropout(dropout)
         if alphabet:
             self.alpha = tf.Variable(1.0, trainable=True)
             self.beta = tf.Variable(0.0, trainable=True)
-    
+
     def get_qkv(self, qkv):
         Q, K, V = tf.split(qkv, 3, axis=-1) # per: bs, sl, d*h 
         Q = tf.reshape(Q, (-1, self.sl, self.d, self.h)) # bs, sl, d, h
@@ -99,18 +98,20 @@ class SelfAttention(L.Layer):
         return Q, K, V # bs*h, sl, d
     
     def build(self, x):
+        in_units = x[-1]
         self.sl = x[1]
         self.out_units = x[-1] if self.out_units==None else self.out_units
         
-        limit = np.sqrt(6 / (self.d + x[-1]))
+        limit = np.sqrt(6 / (in_units*self.d + in_units*self.h))
         self.qkv = L.Dense(
             3*self.d*self.h, use_bias=False, 
             kernel_initializer=I.RandomUniform(-limit, limit)
         )
-        
+
+        limit = np.sqrt(6 / (self.h*self.d + self.h*self.out_units))
         self.Wo = L.Dense(
             self.out_units, use_bias=False,
-            kernel_initializer=I.RandomNormal(0, 0.3*(self.h*self.d)**-0.5)
+            kernel_initializer=I.RandomUniform(-limit, limit)
         )
         self.shortcut = (
             A.linear 
@@ -167,6 +168,7 @@ class CrossAttention(L.Layer):
     def build(self, x):
         self.sl = x[1]
         self.out_units = x[-1] if self.out_units==None else self.out_units
+        # TODO: alter initializer
         self.Wo = L.Dense(
             self.out_units, use_bias=False,
             kernel_initializer=I.RandomNormal(0, 0.3*(self.h*self.d)**-0.5)

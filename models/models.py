@@ -2,7 +2,6 @@ import tensorflow as tf
 K = tf.keras
 L = K.layers
 import models.model_parts as mp
-from tensorflow.keras.layers.experimental import preprocessing
 
 ALPHABET_UNMOD = {
     "A": 1,
@@ -41,7 +40,7 @@ class TransformerModel(K.Model):
         depth=3,
         pos_type='learned', # learned
         integration_method="embed_input", # embed_input | pretoken | inject
-        learned_pos=True,
+        learned_pos=False,
         prenorm=True,
         norm_type="layer",      # layer | batch | adaptive
         penultimate_units=None,
@@ -114,7 +113,6 @@ class TransformerModel(K.Model):
                 is_cross=False,
                 seed=seed
             )
-            
             for i in range(depth)
         ]
 
@@ -167,13 +165,9 @@ class TransformerModel(K.Model):
         precchar = x['precursor_charge_onehot']
         collener = x['collision_energy_aligned_normed']
 
-        #print(sequence.get_shape())
-
-        #out = self.EmbedInputs(x['sequence'], x['precursor_charge'], x['collision_energy'])
         out = self.EmbedInputs(sequence, precchar, collener)
 
         out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]
-
         tb_emb = None
 
         if self.integration_method == 'pretoken': 

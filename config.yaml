@@ -3,7 +3,9 @@
 dataloader:
   dataset: small      # full | small
   batch_size: 1024   # default 2048
+  save_path: /cmnfs/proj/prosit_astral/datasets/parquet
 
+model_type: ours
 model_settings:
   running_units: 256
   d: 64
@@ -18,14 +20,24 @@ model_settings:
   inject_pre: True          # inject before Attention block
   inject_post: False         # inject into FFN
   inject_position: all      # all | first | last | none
+  learned_pos: False
 
+prosit:
+  model_d: 128 # 64
+  embedding_output_dim: 32 # 64
+  ff_dim: 256 # 32
+  num_heads: 16 # 16
+  num_transformers: 6 # 8
+  penult_d: 512 # 256
+  len_fion: 6 # 6
+  dense_dim_factor: 8 # 8
+  dropout_rate: 0 # 0
+  seq_length: 30 # 30
+  transformer_dropout: 0 # 0.1
   
-
-
-
 train_settings:
   epochs: 10
-  lr_method: static      # static | cyclic | dynamic
+  lr_method: static      # static | cyclic | dynamic | decay
   lr_base: 0.0005
   lr_max: 0.001
   log_wandb: True
