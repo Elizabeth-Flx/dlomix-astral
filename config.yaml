@@ -1,8 +1,8 @@
 # large or small dataset
 
 dataloader:
-  dataset: small      # full | small
-  batch_size: 1024   # default 2048
+  dataset: full      # full | small
+  batch_size: 2048   # default 2048
   save_path: /cmnfs/proj/prosit_astral/datasets/parquet
 
 model_type: ours
@@ -15,8 +15,8 @@ model_settings:
   penultimate_units: 512
   alphabet: False
   dropout: 0.1
-  integration_method: adaptive        # embed_input | pretoken | inject | adaptive
-  norm_type: adaptive               # layer | batch | adaptive
+  integration_method: inject        # embed_input | pretoken | inject | adaptive
+  norm_type: layer               # layer | batch | adaptive
   inject_pre: True          # inject before Attention block
   inject_post: False         # inject into FFN
   inject_position: all      # all | first | last | none
@@ -45,3 +45,8 @@ train_settings:
     - [1e07, 1e-3, 0, 10_000]
     - [1e-3, 1e-4, 100_000, 140_000]
   seed: 42                             # doesnt quite work yet
+
+wandb_settings:
+  log_wandb: True
+  name: None
+  project: None

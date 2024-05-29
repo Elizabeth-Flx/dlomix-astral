@@ -170,7 +170,7 @@ if train_settings['log_wandb']:
 #######################################################
 
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from callbacks import CyclicLR, LearningRateLogging
+#from callbacks import CyclicLR, LearningRateLogging
 
 early_stopping = EarlyStopping(
     monitor="val_loss",
@@ -187,13 +187,13 @@ save_best = ModelCheckpoint(
     save_weights_only=True
 )
 
-cyclicLR = CyclicLR(
-    base_lr=train_settings['lr_base'],
-    max_lr=train_settings['lr_max'],
-    step_size=2,
-    mode='triangular',
-    gamma=0.95
-)
+#cyclicLR = CyclicLR(
+#    base_lr=train_settings['lr_base'],
+#    max_lr=train_settings['lr_max'],
+#    step_size=2,
+#    mode='triangular',
+#    gamma=0.95
+#)
 
 class WarmupCooldownLR(tf.keras.callbacks.Callback):
     def __init__(self, 
@@ -218,9 +218,9 @@ class DecayLR(tf.keras.callbacks.Callback):
     # A decay learning rate that decreases the learning rate an order of magnitude
     # every mag_drop_every_n_steps steps.
     def __init__(self,
-        mag_drop_every_n_steps=100000,
-        start_step=20000,
-        end_step=1e10
+        mag_drop_every_n_steps=2,      # 100000
+        start_step=20,                   # 20000
+        end_step=1e10                       # 1e10
     ):
         self.alpha = np.exp(np.log(0.1) / mag_drop_every_n_steps)
         self.start_step = start_step

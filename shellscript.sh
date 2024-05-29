@@ -19,6 +19,9 @@
 #SBATCH --time=96:00:00
 ##SBATCH --array=1-100%3
 
+export CUDA_VERSION=11.8
+export CUDNN_VERSION=8.9.7.29
+
 export XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda
 
 source ~/miniconda3/etc/profile.d/conda.sh
