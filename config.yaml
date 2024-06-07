@@ -3,19 +3,19 @@
 dataloader:
   dataset: full      # full | small
   batch_size: 2048   # default 2048
-  save_path: /cmnfs/proj/prosit_astral/datasets/parquet
+#  save_path: /cmnfs/proj/prosit_astral/datasets/parquet
 
 model_type: ours
 model_settings:
-  running_units: 256
-  d: 64
-  h: 6
-  depth: 6
+  running_units: 256          # 256
+  d: 64                       # 64
+  h: 6                        # 6
+  depth: 8                    # 8         
   ffn_mult: 1
   penultimate_units: 512
   alphabet: False
   dropout: 0.1
-  integration_method: inject        # embed_input | pretoken | inject | adaptive
+  integration_method: pretoken        # embed_input | pretoken | inject | adaptive
   norm_type: layer               # layer | batch | adaptive
   inject_pre: True          # inject before Attention block
   inject_post: False         # inject into FFN
@@ -35,18 +35,20 @@ prosit:
   seq_length: 30 # 30
   transformer_dropout: 0 # 0.1
   
+
 train_settings:
   epochs: 10
-  lr_method: static      # static | cyclic | dynamic | decay
   lr_base: 0.0005
-  lr_max: 0.001
-  log_wandb: True
-  lr_dynamic:
-    - [1e07, 1e-3, 0, 10_000]
-    - [1e-3, 1e-4, 100_000, 140_000]
+
+  lr_method: static      # static | geometric | linear
+  
+  lr_geometric: [0, 0.0005, 0.8, 1]
+  lr_linear: [0, 10, 0.0005, 0.0005]
+
   seed: 42                             # doesnt quite work yet
+  log_wandb: True
 
 wandb_settings:
   log_wandb: True
   name: None
-  project: None
+  project: astral_benchmarks

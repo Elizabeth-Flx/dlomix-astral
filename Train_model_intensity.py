@@ -65,10 +65,12 @@ match config['dataloader']['dataset']:
         train_data_source = "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_train.parquet"
         val_data_source =   "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_val.parquet"
         test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_test.parquet"
+        steps_per_epoch = 7_992 / config['dataloader']['batch_size']
     case 'full':
         train_data_source = "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_train.parquet"
         val_data_source =   "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_val.parquet"
         test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_test.parquet"
+        steps_per_epoch = 21_263_168 / config['dataloader']['batch_size']
 
 # Faster loading if dataset is already saved
 #if os.path.exists(config['dataloader']['save_path'] + '/dataset_dict.json') and (config['dataloader']['dataset'] != 'small'):
@@ -86,7 +88,7 @@ int_data = FragmentIonIntensityDataset(
     model_features=["precursor_charge_onehot", "collision_energy_aligned_normed","method_nbr"],
     batch_size=config['dataloader']['batch_size']
 )
-int_data.save_to_disk(config['dataloader']['save_path'])
+#int_data.save_to_disk(config['dataloader']['save_path'])
 
 #################################################
 #         Choose and compile model              #
@@ -102,7 +104,7 @@ if config['model_type'] == 'ours':
     if model_settings['integration_method'] not in ['embed_input', 'pretoken', 'inject', 'adaptive']:
         raise ValueError("Invalid model setting for 'integration_method'")
 
-    model = TransformerModel(**model_settings)
+    model = TransformerModel(**model_settings, seed=train_settings['seed'])
 
 elif config['model_type'] == 'prosit_t':
     from models.prosit_t.models.prosit_transformer import PrositTransformerMean174M2 as PrositTransformer
@@ -119,6 +121,8 @@ model.compile(optimizer=optimizer,
 inp = [m for m in int_data.tensor_train_data.take(1)][0][0]
 out = model(inp)
 model.summary()
+
+print(len(int_data.tensor_train_data))
 
 ###################################################
 #                   Wandb init                    #
@@ -149,7 +153,6 @@ tags = [
     'int_method_' + model_settings['integration_method'],
     'lr_method_' + train_settings['lr_method'],
     'lr_base_' + str(train_settings['lr_base']),
-    'lr_max_' + str(train_settings['lr_max']),
 ]
 tags + [model_settings['inject_pre'], 
         model_settings['inject_post'], 
@@ -158,7 +161,7 @@ tags + [model_settings['inject_pre'],
 if train_settings['log_wandb']:
     wandb.login(key='d6d86094362249082238642ed3a0380fde08761c')
     wandb.init(
-        project="match_loss",
+        project="astral" if config['wandb_settings']['project'] != None else config['wandb_settings']['project'],
         name=name,
         tags=tags,
         config=config,
@@ -195,45 +198,104 @@ save_best = ModelCheckpoint(
 #    gamma=0.95
 #)
 
-class WarmupCooldownLR(tf.keras.callbacks.Callback):
-    def __init__(self, 
-        start_lr, end_lr, steps, step_start=0
-    ):
-        self.start_lr = start_lr
+class LLR(tf.keras.callbacks.Callback):
+    def __init__(self, start_step=20000, end_step=50000, end_lr=1e-5):
+        super(LLR, self).__init__()
+        self.start_step = start_step
+        self.end_step = end_step
         self.end_lr = end_lr
-        self.steps = steps
-        self.step_start = step_start
-        self.step_end = step_start + steps
+        self.initial_lr = None  # This will be set in the first on_train_batch_begin call
 
-        self.schedule = np.linspace(start_lr, end_lr, steps)
-        self.ticker = 0
-
-    def on_train_batch_begin(self, batch, *args):
-        global_step = model.optimizer.variables[0].numpy()
-        if (global_step >= self.step_start) & (global_step < self.step_end):
-            self.model.optimizer._learning_rate.assign(self.schedule[self.ticker])
-            self.ticker += 1
+    def on_train_batch_begin(self, batch, logs=None):
+        global_step = tf.keras.backend.get_value(self.model.optimizer.iterations)
+        
+        if self.initial_lr is None:
+            self.initial_lr = tf.keras.backend.get_value(self.model.optimizer.learning_rate)
+        
+        if self.start_step <= global_step < self.end_step:
+            progress = (global_step - self.start_step) / (self.end_step - self.start_step)
+            new_lr = self.initial_lr - progress * (self.initial_lr - self.end_lr)
+            tf.keras.backend.set_value(self.model.optimizer.learning_rate, new_lr)
+        elif global_step >= self.end_step:
+            tf.keras.backend.set_value(self.model.optimizer.learning_rate, self.end_lr)
 
 class DecayLR(tf.keras.callbacks.Callback):
     # A decay learning rate that decreases the learning rate an order of magnitude
     # every mag_drop_every_n_steps steps.
     def __init__(self,
-        mag_drop_every_n_steps=2,      # 100000
-        start_step=20,                   # 20000
+        mag_drop_every_n_steps=100000,      # 100000
+        start_step=20000,                   # 20000
         end_step=1e10                       # 1e10
     ):
+        super(DecayLR, self).__init__()
         self.alpha = np.exp(np.log(0.1) / mag_drop_every_n_steps)
         self.start_step = start_step
         self.end_step = end_step
         self.ticker = 1
 
     def on_train_batch_begin(self, batch, *args):
-        global_step = model.optimizer.variables[0].numpy()
+        #global_step = model.optimizer.variables[0].numpy()
+        global_step = int(tf.keras.backend.get_value(self.model.optimizer.iterations))
         if (global_step >= self.start_step) & (global_step < self.end_step):
-            current_lr = model.optimizer._learning_rate.numpy()
-            new_lr  = current_lr * self.alpha
-            model.optimizer._learning_rate.assign(new_lr)
-            self.ticker += 1
+            current_lr = tf.keras.backend.get_value(self.model.optimizer.learning_rate)
+            new_lr = current_lr * self.alpha
+            tf.keras.backend.set_value(self.model.optimizer.learning_rate, new_lr)
+
+class GeometricLR(tf.keras.callbacks.Callback):
+    def __init__(self,
+                 epoch_start,
+                 lr_start,
+                 decay_factor,
+                 decay_constant
+    ):
+        super(GeometricLR, self).__init__()
+        self.epoch_start = epoch_start
+        self.lr_start = lr_start
+        self.decay_factor = decay_factor
+        self.decay_constant = decay_constant * steps_per_epoch
+
+        self.step_start = epoch_start * steps_per_epoch
+
+    def on_train_batch_begin(self, batch, *args):
+        step = int(tf.keras.backend.get_value(self.model.optimizer.iterations))
+
+        if step < self.step_start:
+            lr_new = self.lr_start
+        else:
+            step_adj = step - self.step_start
+            lr_new = self.lr_start * (self.decay_factor ** (step_adj / self.decay_constant))
+        
+        tf.keras.backend.set_value(self.model.optimizer.lr, lr_new)
+
+class LinearLR(tf.keras.callbacks.Callback):
+    def __init__(self,
+                 epoch_start,
+                 epoch_end,
+                 lr_start,
+                 lr_end,
+    ):
+        super(LinearLR, self).__init__()
+        self.epoch_start = epoch_start
+        self.epoch_end = epoch_end
+        self.lr_start = lr_start
+        self.lr_end = lr_end
+
+        self.step_start = epoch_start * steps_per_epoch
+        self.step_end = epoch_end * steps_per_epoch
+
+    def on_train_batch_begin(self, batch, *args):
+        step = int(tf.keras.backend.get_value(self.model.optimizer.iterations))
+
+        if step < self.step_start:
+            lr_new = self.lr_start
+        elif step > self.step_end:
+            lr_new = self.lr_end
+        else:
+            step_adj = step - self.step_start
+            lr_new = self.lr_start + step_adj * (self.lr_end - self.lr_start) / (self.step_end - self.step_start)
+        
+        tf.keras.backend.set_value(self.model.optimizer.lr, lr_new)
+
 
 
 class LearningRateReporter(tf.keras.callbacks.Callback):
@@ -244,13 +306,16 @@ callbacks = []
 if train_settings['log_wandb']:
     callbacks.append(WandbCallback(save_model=False))
     callbacks.append(LearningRateReporter())
-if train_settings['lr_method'] == 'cyclic':
-    callbacks.append(cyclicLR)
-elif train_settings['lr_method'] == 'dynamic':
-    for lr in train_settings['lr_dynamic']:
-        callbacks.append(WarmupCooldownLR(*lr))
-elif train_settings['lr_method'] == 'decay':
-    callbacks.append(DecayLR(mag_drop_every_n_steps=1e5, start_step=2e4, end_step=1.2e5))
+
+if train_settings['lr_method'] == 'geometric':
+    callbacks.append(GeometricLR(*train_settings['lr_geometric']))
+
+elif train_settings['lr_method'] == 'linear':
+    callbacks.append(LinearLR(*train_settings['lr_linear']))
+
+#elif train_settings['lr_method'] == 'decay':
+#    for lr in train_settings['lr_decay']:
+#        callbacks.append(DecayLR(*lr))
 
 ##############################################################
 #                       Train model                          #
