@@ -10,12 +10,12 @@ model_settings:
   running_units: 256          # 256
   d: 64                       # 64
   h: 6                        # 6
-  depth: 8                    # 8         
+  depth: 3                    # 8         
   ffn_mult: 1
   penultimate_units: 512
   alphabet: False
   dropout: 0.1
-  integration_method: pretoken        # embed_input | pretoken | inject | adaptive
+  integration_method: token_summation        # embed_input | multi_token | single_token | token_summation | inject | adaptive
   norm_type: layer               # layer | batch | adaptive
   inject_pre: True          # inject before Attention block
   inject_post: False         # inject into FFN
@@ -42,8 +42,8 @@ train_settings:
 
   lr_method: static      # static | geometric | linear
   
-  lr_geometric: [0, 0.0005, 0.8, 1]
-  lr_linear: [0, 10, 0.0005, 0.0005]
+  lr_geometric: [5, 0.0005, 0.5, 1]
+  lr_linear: [5, 10, 0.0005, 0.00005]
 
   seed: 42                             # doesnt quite work yet
   log_wandb: True

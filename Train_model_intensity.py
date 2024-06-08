@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from datasets import disable_caching
+#from datasets import disable_caching
 #disable_caching()
 
 from dlomix.constants import PTMS_ALPHABET
@@ -101,7 +101,7 @@ if config['model_type'] == 'ours':
 
     print("Loading Transformer Model")
 
-    if model_settings['integration_method'] not in ['embed_input', 'pretoken', 'inject', 'adaptive']:
+    if model_settings['integration_method'] not in ['embed_input', 'multi_token', 'single_token', 'token_summation', 'inject', 'adaptive']:
         raise ValueError("Invalid model setting for 'integration_method'")
 
     model = TransformerModel(**model_settings, seed=train_settings['seed'])
@@ -161,7 +161,7 @@ tags + [model_settings['inject_pre'],
 if train_settings['log_wandb']:
     wandb.login(key='d6d86094362249082238642ed3a0380fde08761c')
     wandb.init(
-        project="astral" if config['wandb_settings']['project'] != None else config['wandb_settings']['project'],
+        project="astral" if config['wandb_settings']['project'] == None else config['wandb_settings']['project'],
         name=name,
         tags=tags,
         config=config,
@@ -198,48 +198,8 @@ save_best = ModelCheckpoint(
 #    gamma=0.95
 #)
 
-class LLR(tf.keras.callbacks.Callback):
-    def __init__(self, start_step=20000, end_step=50000, end_lr=1e-5):
-        super(LLR, self).__init__()
-        self.start_step = start_step
-        self.end_step = end_step
-        self.end_lr = end_lr
-        self.initial_lr = None  # This will be set in the first on_train_batch_begin call
-
-    def on_train_batch_begin(self, batch, logs=None):
-        global_step = tf.keras.backend.get_value(self.model.optimizer.iterations)
-        
-        if self.initial_lr is None:
-            self.initial_lr = tf.keras.backend.get_value(self.model.optimizer.learning_rate)
-        
-        if self.start_step <= global_step < self.end_step:
-            progress = (global_step - self.start_step) / (self.end_step - self.start_step)
-            new_lr = self.initial_lr - progress * (self.initial_lr - self.end_lr)
-            tf.keras.backend.set_value(self.model.optimizer.learning_rate, new_lr)
-        elif global_step >= self.end_step:
-            tf.keras.backend.set_value(self.model.optimizer.learning_rate, self.end_lr)
-
-class DecayLR(tf.keras.callbacks.Callback):
-    # A decay learning rate that decreases the learning rate an order of magnitude
-    # every mag_drop_every_n_steps steps.
-    def __init__(self,
-        mag_drop_every_n_steps=100000,      # 100000
-        start_step=20000,                   # 20000
-        end_step=1e10                       # 1e10
-    ):
-        super(DecayLR, self).__init__()
-        self.alpha = np.exp(np.log(0.1) / mag_drop_every_n_steps)
-        self.start_step = start_step
-        self.end_step = end_step
-        self.ticker = 1
-
-    def on_train_batch_begin(self, batch, *args):
-        #global_step = model.optimizer.variables[0].numpy()
-        global_step = int(tf.keras.backend.get_value(self.model.optimizer.iterations))
-        if (global_step >= self.start_step) & (global_step < self.end_step):
-            current_lr = tf.keras.backend.get_value(self.model.optimizer.learning_rate)
-            new_lr = current_lr * self.alpha
-            tf.keras.backend.set_value(self.model.optimizer.learning_rate, new_lr)
+class CyclicLR(tf.keras.callbacks.Callback):
+    pass
 
 class GeometricLR(tf.keras.callbacks.Callback):
     def __init__(self,

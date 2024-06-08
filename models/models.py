@@ -39,7 +39,7 @@ class TransformerModel(K.Model):
         ffn_mult=1,
         depth=3,
         pos_type='learned', # learned
-        integration_method="embed_input", # embed_input | pretoken | inject
+        integration_method="embed_input", # embed_input | single_token | multi_token | inject
         learned_pos=False,
         prenorm=True,
         norm_type="layer",      # layer | batch | adaptive
@@ -81,7 +81,7 @@ class TransformerModel(K.Model):
         
         #self.embedding = L.Embedding(len(ALPHABET_UNMOD), running_units, input_length=sequence_length)
         self.first = L.Dense(running_units)
-        if integration_method in ['pretoken', 'inject', 'adaptive']:
+        if integration_method in ['multi_token', 'single_token', 'token_summation', 'inject', 'adaptive']:
             self.charge_embedder = L.Dense(running_units) #mp.PrecursorToken(running_units, 64, 1, 15)
             self.ce_embedder = mp.PrecursorToken(running_units, running_units, 0.01, 1.5)
     
@@ -170,9 +170,18 @@ class TransformerModel(K.Model):
         out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]
         tb_emb = None
 
-        if self.integration_method == 'pretoken': 
-            charge_ce_token = self.charge_embedder(precchar) + self.ce_embedder(collener)
-            out = tf.concat([charge_ce_token[:,None], out], axis=1)
+        if self.integration_method == 'multi_token': 
+            charge_token = self.charge_embedder(precchar)
+            ce_token = self.ce_embedder(collener)
+            out = tf.concat([charge_token[:,None], ce_token[:,None], out], axis=1)
+
+        if self.integration_method == 'single_token': 
+            combined_token = self.charge_embedder(precchar) + self.ce_embedder(collener)
+            out = tf.concat([combined_token[:,None], out], axis=1)
+
+        if self.integration_method == 'token_summation': 
+            combined_token = self.charge_embedder(precchar) + self.ce_embedder(collener)
+            out = out + combined_token[:,None]
 
         elif self.integration_method in ['inject', 'adaptive']:    # if chosen inject into transformer blocks
             charge_ce_embedding = tf.concat([
