@@ -101,8 +101,8 @@ if config['model_type'] == 'ours':
 
     print("Loading Transformer Model")
 
-    if model_settings['integration_method'] not in ['embed_input', 'multi_token', 'single_token', 'token_summation', 'inject', 'adaptive']:
-        raise ValueError("Invalid model setting for 'integration_method'")
+    #if model_settings['integration_method'] not in ['embed_input', 'multi_token', 'single_token', 'token_summation', 'inject', 'adaptive']:
+    #    raise ValueError("Invalid model setting for 'integration_method'")
 
     model = TransformerModel(**model_settings, seed=train_settings['seed'])
 
