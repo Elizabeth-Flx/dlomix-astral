@@ -81,10 +81,17 @@ class TransformerModel(K.Model):
         
         #self.embedding = L.Embedding(len(ALPHABET_UNMOD), running_units, input_length=sequence_length)
         self.first = L.Dense(running_units)
-        if integration_method in ['multi_token', 'single_token', 'token_summation', 'inject', 'adaptive', 'token_multiplication_1', 'token_multiplication_2']:
+        if integration_method in ['multi_token', 'single_token', 'token_summation', 'inject', 'adaptive', 'token_multiplication_1', 'token_multiplication_2', 'FiLM_small', 'FiLM_large']:
             self.charge_embedder = L.Dense(running_units) #mp.PrecursorToken(running_units, 64, 1, 15)
             self.ce_embedder = mp.PrecursorToken(running_units, running_units, 0.01, 1.5)
-    
+
+        if integration_method == 'FiLM_small':
+            self.film_gamma = tf.Variable(tf.ones((1,1,running_units)), name="film_gamma")
+            self.film_beta = tf.Variable(tf.ones((1,1,running_units)), name="film_beta")
+
+        if integration_method == 'FiLM_large':
+            self.film_gamma = tf.Variable(tf.ones((1,sequence_length,running_units)), name="film_gamma")
+            self.film_beta = tf.Variable(tf.ones((1,sequence_length,running_units)), name="film_beta")
 
         # Middle
         attention_dict = {
@@ -193,7 +200,11 @@ class TransformerModel(K.Model):
             out = out * charge_token[:,None]
             out = out * ce_token[:,None]
 
-        elif self.integration_method in ['inject', 'adaptive']:    # if chosen inject into transformer blocks
+        if self.integration_method in ['FiLM_small', 'FiLM_large']: 
+            combined_token = (self.charge_embedder(precchar) + self.ce_embedder(collener))[:,None]
+            out = out * (self.film_gamma * combined_token) + self.film_beta * combined_token
+
+        if self.integration_method in ['inject', 'adaptive']:    # if chosen inject into transformer blocks
             charge_ce_embedding = tf.concat([
                 self.charge_embedder(precchar),     # (bs, running_units)
                 self.ce_embedder(collener)          # (bs, running_units)
