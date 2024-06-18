@@ -2,6 +2,7 @@ import tensorflow as tf
 K = tf.keras
 L = K.layers
 import models.model_parts as mp
+import numpy as np
 
 ALPHABET_UNMOD = {
     "A": 1,
@@ -40,6 +41,7 @@ class TransformerModel(K.Model):
         depth=3,
         pos_type='learned', # learned
         integration_method="embed_input", # embed_input | single_token | multi_token | inject
+        token_combine ='add',    # add | mult
         learned_pos=False,
         prenorm=True,
         norm_type="layer",      # layer | batch | adaptive
@@ -67,6 +69,8 @@ class TransformerModel(K.Model):
         self.inject_post = inject_post
         self.inject_position = inject_position
 
+        self.token_combine = token_combine
+
 
         # Positional
         if learned_pos:
@@ -81,17 +85,17 @@ class TransformerModel(K.Model):
         
         #self.embedding = L.Embedding(len(ALPHABET_UNMOD), running_units, input_length=sequence_length)
         self.first = L.Dense(running_units)
-        if integration_method in ['multi_token', 'single_token', 'token_summation', 'inject', 'adaptive', 'token_multiplication_1', 'token_multiplication_2', 'FiLM_small', 'FiLM_large']:
+        if integration_method in ['multi_token', 'single_token', 'token_sum', 'inject', 'adaptive', 'token_mult', 'FiLM_small', 'FiLM_large', 'penult_add']:
             self.charge_embedder = L.Dense(running_units) #mp.PrecursorToken(running_units, 64, 1, 15)
             self.ce_embedder = mp.PrecursorToken(running_units, running_units, 0.01, 1.5)
 
         if integration_method == 'FiLM_small':
             self.film_gamma = tf.Variable(tf.ones((1,1,running_units)), name="film_gamma")
-            self.film_beta = tf.Variable(tf.ones((1,1,running_units)), name="film_beta")
+            self.film_beta = tf.Variable(tf.zeros((1,1,running_units)), name="film_beta")
 
         if integration_method == 'FiLM_large':
             self.film_gamma = tf.Variable(tf.ones((1,sequence_length,running_units)), name="film_gamma")
-            self.film_beta = tf.Variable(tf.ones((1,sequence_length,running_units)), name="film_beta")
+            self.film_beta = tf.Variable(tf.zeros((1,sequence_length,running_units)), name="film_beta")
 
         # Middle
         attention_dict = {
@@ -125,12 +129,17 @@ class TransformerModel(K.Model):
 
         # End
         penultimate_units = running_units if penultimate_units is None else penultimate_units
+
+        if integration_method == 'penult_add':
+            self.meta_encoder = L.Dense(penultimate_units)
+            self.prepenult = L.Dense(penultimate_units)
+        
         self.penultimate = K.Sequential([
-            L.Dense(penultimate_units),
-            #L.BatchNormalization(),
+            *( [L.Dense(penultimate_units)] if integration_method != 'penult_add' else [] ),
             L.LayerNormalization(),
             L.ReLU()
         ])
+        
         self.final = L.Dense(output_units, activation='sigmoid')
 
     def EmbedInputs(self, sequence, precursor_charge, collision_energy):
@@ -177,42 +186,37 @@ class TransformerModel(K.Model):
         out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]
         tb_emb = None
 
-        if self.integration_method == 'multi_token': 
-            charge_token = self.charge_embedder(precchar)
-            ce_token = self.ce_embedder(collener)
-            out = tf.concat([charge_token[:,None], ce_token[:,None], out], axis=1)
+        # === Methods that alter the transformer tokens === #
+        if self.integration_method in ['multi_token', 'single_token', 'token_sum', 'inject', 'adaptive', 'token_mult', 'FiLM_small', 'FiLM_large', 'penult_add']:
+            charge_token = self.charge_embedder(precchar)    # (bs, ru)
+            ce_token = self.ce_embedder(collener)            # (bs, ru)
 
-        if self.integration_method == 'single_token': 
-            combined_token = self.charge_embedder(precchar) + self.ce_embedder(collener)
-            out = tf.concat([combined_token[:,None], out], axis=1)
+            if self.token_combine == 'add':
+                combined_token = (charge_token + ce_token)[:,None]      # (bs, 1, ru)
+            elif self.token_combine == 'mult':
+                combined_token = (charge_token * ce_token)[:,None]      # (bs, 1, ru)
 
-        if self.integration_method == 'token_summation': 
-            combined_token = self.charge_embedder(precchar) + self.ce_embedder(collener)
-            out = out + combined_token[:,None]
-
-        if self.integration_method == 'token_multiplication_1': 
-            combined_token = self.charge_embedder(precchar) + self.ce_embedder(collener)
-            out = out * combined_token[:,None]
-
-        if self.integration_method == 'token_multiplication_2': 
-            charge_token = self.charge_embedder(precchar)
-            ce_token = self.ce_embedder(collener)
-            out = out * charge_token[:,None]
-            out = out * ce_token[:,None]
-
-        if self.integration_method in ['FiLM_small', 'FiLM_large']: 
-            combined_token = (self.charge_embedder(precchar) + self.ce_embedder(collener))[:,None]
-            out = out * (self.film_gamma * combined_token) + self.film_beta * combined_token
-
-        if self.integration_method in ['inject', 'adaptive']:    # if chosen inject into transformer blocks
-            charge_ce_embedding = tf.concat([
-                self.charge_embedder(precchar),     # (bs, running_units)
-                self.ce_embedder(collener)          # (bs, running_units)
-            ], axis=-1)                             # (bs, 2*running_units)
-            tb_emb = tf.nn.silu(charge_ce_embedding)
+        match self.integration_method:
+            case 'multi_token':
+                out = tf.concat([charge_token[:,None], ce_token[:,None], out], axis=1)
+            case 'single_token':
+                out = tf.concat([combined_token, out], axis=1)
+            case 'token_sum':
+                out = out + combined_token
+            case 'token_mult':
+                out = out * combined_token
+            case 'FiLM_small' | 'FiLM_large':
+                out = out * (self.film_gamma * combined_token) + self.film_beta * combined_token
+            case 'inject' | 'adaptive' | 'penult_add':
+                tb_emb = tf.concat([charge_token, ce_token], axis=-1)   # (bs, 2*running_units)
 
         out = self.Main(out, tb_emb=tb_emb)     # Transformer blocks
+
+        if self.integration_method == 'penult_add':
+            out = self.prepenult(out) + self.meta_encoder(tb_emb)[:,None]
+
         out = self.penultimate(out)
+
         out = self.final(out)
 
         return tf.reduce_mean(out, axis=1)
