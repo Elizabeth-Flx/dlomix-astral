@@ -187,7 +187,8 @@ class TransformerModel(K.Model):
         tb_emb = None
 
         # === Methods that alter the transformer tokens === #
-        if self.integration_method in ['multi_token', 'single_token', 'token_sum', 'inject', 'adaptive', 'token_mult', 'FiLM_small', 'FiLM_large', 'penult_add']:
+        if self.integration_method in ['multi_token', 'single_token', 'token_sum', 'token_mult', 'FiLM_small', 'FiLM_large', 
+                                       'inject', 'adaptive', 'penult_add', 'penult_mult']:
             charge_token = self.charge_embedder(precchar)    # (bs, ru)
             ce_token = self.ce_embedder(collener)            # (bs, ru)
 
@@ -207,13 +208,15 @@ class TransformerModel(K.Model):
                 out = out * combined_token
             case 'FiLM_small' | 'FiLM_large':
                 out = out * (self.film_gamma * combined_token) + self.film_beta * combined_token
-            case 'inject' | 'adaptive' | 'penult_add':
+            case 'inject' | 'adaptive' | 'penult_add' | 'penult_mult':
                 tb_emb = tf.concat([charge_token, ce_token], axis=-1)   # (bs, 2*running_units)
 
         out = self.Main(out, tb_emb=tb_emb)     # Transformer blocks
 
         if self.integration_method == 'penult_add':
             out = self.prepenult(out) + self.meta_encoder(tb_emb)[:,None]
+        elif self.integration_method == 'penult_mult':
+            out = self.prepenult(out) * self.meta_encoder(tb_emb)[:,None]
 
         out = self.penultimate(out)
 
