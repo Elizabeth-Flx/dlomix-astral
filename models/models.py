@@ -172,10 +172,16 @@ class TransformerModel(K.Model):
 
         # method multi_token requires each attribute to have their own embedding
         if self.integration_method == 'multi_token':
-            char_token = self.char_embedder(char_oh)[:, None]   # (bs, 1, ru)
-            ener_token = self.ener_embedder(ener)   [:, None]   # (bs, 1, ru)
-            meth_token = self.meth_embedder(meth_oh)[:, None]   # (bs, 1, ru)
-            mach_token = self.mach_embedder(mach_oh)[:, None]   # (bs, 1, ru)
+            char_token = self.char_embedder(char_oh)        [:, None]   # (bs, 1, ru)
+            ener_token = self.ener_embedder(ener[:, None])  [:, None]   # (bs, 1, ru)
+            meth_token = self.meth_embedder(meth_oh)        [:, None]   # (bs, 1, ru)
+            mach_token = self.mach_embedder(mach_oh)        [:, None]   # (bs, 1, ru)
+
+            print("======")
+            print(char_token.shape)
+            print(ener_token.shape)
+            print(meth_token.shape)
+            print(mach_token.shape)
 
             return tf.concat([char_token, ener_token, meth_token, mach_token], axis=1)  # (bs, 4, ru)
 
@@ -193,14 +199,19 @@ class TransformerModel(K.Model):
     def Main(self, x, metadata=None):     # todo alter to work with integration methods
         out = x
 
+        metadata = metadata[:, None]
+
         if self.integration_method in ['FiLM_full', 'FiLM_reduced']:
-            metadata = tf.split(metadata, self.depth)
+            metadata = tf.split(metadata, self.depth, axis=-1)
 
         for i in range(len(self.main)):
             layer = self.main[i]
 
+            print(out.shape)
+            #print(metadata.shape)
+
             if self.integration_method in ['FiLM_full', 'FiLM_reduced']:
-                gamma, beta = tf.split(metadata[i], 2)
+                gamma, beta = tf.split(metadata[i], 2, axis=-1)
                 out = out*gamma + beta
             elif self.integration_method == 'token_sum':    # these should have a gate variable alpha 
                 out = out + metadata
@@ -239,7 +250,9 @@ class TransformerModel(K.Model):
 
         out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]  # todo check about this positional encoding (seems wierd)
 
-        if self.integration_method in ['single_token', 'multi_token']:
+        if self.integration_method == 'single_token':           # todo make this better (low prio)
+            out = tf.concat([out, metadata[:, None]], axis=1)
+        elif self.integration_method == 'multi_token':
             out = tf.concat([out, metadata], axis=1)
 
         out = self.Main(out, metadata)     # Transformer blocks

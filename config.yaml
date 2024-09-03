@@ -15,7 +15,7 @@ model_settings:
   penultimate_units: 512
   alphabet: False
   dropout: 0.1
-  integration_method: penult_sum        # embed_input | multi_token | single_token | token_summation | inject | adaptive
+  integration_method: FiLM_reduced        # embed_input | multi_token | single_token | token_summation | inject | adaptive
   norm_type: layer               # layer | batch | adaptive
   inject_pre: True          # inject before Attention block
   inject_post: False         # inject into FFN
