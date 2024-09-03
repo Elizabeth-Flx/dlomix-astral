@@ -177,9 +177,9 @@ class TransformerModel(K.Model):
 
     def call(self, x, training=False):
 
-        sequence = x['modified_sequence']
+        sequence = x['encoded_seqeunce']
         precchar = x['precursor_charge_onehot']
-        collener = x['collision_energy_aligned_normed']
+        collener = x['collision_energy']
 
         out = self.EmbedInputs(sequence, precchar, collener)
 

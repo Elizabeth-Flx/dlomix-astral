@@ -1,21 +1,39 @@
 import os
-os.environ['HF_HOME'] = "/cmnfs/proj/prosit_astral"
-os.environ['HF_DATASETS_CACHE'] = "/cmnfs/proj/prosit_astral/datasets"
-
-print("[UNIMOD:1]-K[UNIMOD:1]".count('[UNIMOD:' + '1' + ']'))
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-#from datasets import disable_caching
-#disable_caching()
-
-from dlomix.constants import PTMS_ALPHABET
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
 import yaml
 
-# Check if conda and cuda is setup properly
+MAX_SEQUENCE_LENGTH = 30
+MAX_COLLISION_ENERGY = 6
+
+protein_map = {
+    'A': 1,
+    'C': 2,  # fixed modification cysteine
+    'D': 3,
+    'E': 4,
+    'F': 5,
+    'G': 6,
+    'H': 7,
+    'I': 8,
+    'K': 9,
+    'L': 10,
+    'M': 11,
+    'N': 12,
+    'P': 13,
+    'Q': 14,
+    'R': 15,
+    'S': 16,
+    'T': 17,
+    'V': 18,
+    'W': 19,
+    'Y': 20,
+    'm': 21, # oxidized methionine
+}
+
 print('='*32)
 print('Conda info')
 print(f"Environment: {os.environ['CONDA_DEFAULT_ENV']}")
@@ -28,7 +46,7 @@ print(f"List of GPUs available: {tf.config.list_physical_devices('GPU')}")
 print('='*32)
 
 
-with open("/nfs/home/students/d.lochert/projects/astral/dlomix/my_scripts/config.yaml", 'r') as yaml_file:
+with open("/nfs/home/students/d.lochert/projects/astral/dlomix-astral/config.yaml", 'r') as yaml_file:
     config = yaml.safe_load(yaml_file)
 
 model_settings = config['model_settings']
@@ -53,12 +71,39 @@ for key, value in train_settings.items():
 print('='*32)
 
 
-################################################
-#                  Dataset                     #
-################################################
+
+###################################################
+#                   Data Loader                   #
+###################################################
 
 from dlomix.data import FragmentIonIntensityDataset
-#from dlomix.data import load_processed_dataset
+
+CUSTOM_ALPHABET = {
+    'A': 1,
+    'C': 2,
+    'D': 3,
+    'E': 4,
+    'F': 5,
+    'G': 6,
+    'H': 7,
+    'I': 8,
+    'K': 9,
+    'L': 10,
+    'M': 11,
+    'N': 12,
+    'P': 13,
+    'Q': 14,
+    'R': 15,
+    'S': 16,
+    'T': 17,
+    'V': 18,
+    'W': 19,
+    'Y': 20,
+    'm': 21, # oxidized methionine
+}
+
+os.environ['HF_HOME'] = "/cmnfs/proj/prosit_astral"
+os.environ['HF_DATASETS_CACHE'] = "/cmnfs/proj/prosit_astral/datasets"
 
 match config['dataloader']['dataset']:
     case 'small':
@@ -71,6 +116,11 @@ match config['dataloader']['dataset']:
         val_data_source =   "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_val.parquet"
         test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_test.parquet"
         steps_per_epoch = 21_263_168 / config['dataloader']['batch_size']
+    case 'combined':
+        train_data_source = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing.parquet"
+        val_data_source =   "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing.parquet"
+        test_data_source =  "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing.parquet"
+        steps_per_epoch = 630_000 / config['dataloader']['batch_size']
 
 # Faster loading if dataset is already saved
 #if os.path.exists(config['dataloader']['save_path'] + '/dataset_dict.json') and (config['dataloader']['dataset'] != 'small'):
@@ -78,41 +128,29 @@ match config['dataloader']['dataset']:
 #else:
 int_data = FragmentIonIntensityDataset(
     data_source=train_data_source,
-    val_data_source=val_data_source,
-    test_data_source=test_data_source,
+    # val_data_source=val_data_source,
+    # test_data_source=test_data_source,
     data_format="parquet", 
     val_ratio=0.2, 
     max_seq_len=30, 
     encoding_scheme="naive-mods",
-    alphabet=PTMS_ALPHABET,
-    model_features=["precursor_charge_onehot", "collision_energy_aligned_normed","method_nbr","scan_number"],
+    alphabet=CUSTOM_ALPHABET,
+    model_features=["charge_oh", "collision_energy","method_nr_oh","machine_oh"],
     batch_size=config['dataloader']['batch_size']
 )
-#int_data.save_to_disk(config['dataloader']['save_path'])
 
-#################################################
-#         Choose and compile model              #
-#################################################
+print([m for m in int_data.tensor_train_data.take(1)][0][0])
+print([m for m in int_data.tensor_train_data.take(1)][0][1])
+
+
+
+from models.models import TransformerModel
+
+print("Loading Transformer Model")
+
+model = TransformerModel(**model_settings, seed=train_settings['seed'])
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=train_settings['lr_base'])
-
-if config['model_type'] == 'ours':
-    from models.models import TransformerModel
-
-    print("Loading Transformer Model")
-
-    #if model_settings['integration_method'] not in ['embed_input', 'multi_token', 'single_token', 'token_summation', 'inject', 'adaptive']:
-    #    raise ValueError("Invalid model setting for 'integration_method'")
-
-    model = TransformerModel(**model_settings, seed=train_settings['seed'])
-
-elif config['model_type'] == 'prosit_t':
-    from models.prosit_t.models.prosit_transformer import PrositTransformerMean174M2 as PrositTransformer
-
-    model = PrositTransformer(
-        vocab_dict=PTMS_ALPHABET,
-        **config['prosit']
-    )
 
 print("Compiling Transformer Model")
 model.compile(optimizer=optimizer, 
@@ -120,14 +158,17 @@ model.compile(optimizer=optimizer,
             metrics=[masked_pearson_correlation_distance])
 inp = [m for m in int_data.tensor_train_data.take(1)][0][0]
 
-#print(inp)
-
-print(int_data.tensor_train_data.take(1))
+print(int_data.tensor_train_data.take(1)[0])
+print(int_data.tensor_train_data.take(1)[1])
 
 out = model(inp)
 model.summary()
 
-print(len(int_data.tensor_train_data))
+
+# stop code
+raise Exception('Stop code') 
+
+# print(len(int_data.tensor_train_data))
 
 ###################################################
 #                   Wandb init                    #
@@ -206,20 +247,20 @@ save_best = ModelCheckpoint(
 class CyclicLR(tf.keras.callbacks.Callback):
     pass
 
-class GeometricLR(tf.keras.callbacks.Callback):
-    def __init__(self,
-                 epoch_start,
-                 lr_start,
-                 decay_factor,
-                 decay_constant
-    ):
-        super(GeometricLR, self).__init__()
-        self.epoch_start = epoch_start
-        self.lr_start = lr_start
-        self.decay_factor = decay_factor
-        self.decay_constant = decay_constant * steps_per_epoch
+# class GeometricLR(tf.keras.callbacks.Callback):
+#     def __init__(self,
+#                  epoch_start,
+#                  lr_start,
+#                  decay_factor,
+#                  decay_constant
+#     ):
+#         super(GeometricLR, self).__init__()
+#         self.epoch_start = epoch_start
+#         self.lr_start = lr_start
+#         self.decay_factor = decay_factor
+#         self.decay_constant = decay_constant * steps_per_epoch
 
-        self.step_start = epoch_start * steps_per_epoch
+#         self.step_start = epoch_start * steps_per_epoch
 
     def on_train_batch_begin(self, batch, *args):
         step = int(tf.keras.backend.get_value(self.model.optimizer.iterations))
@@ -232,21 +273,21 @@ class GeometricLR(tf.keras.callbacks.Callback):
         
         tf.keras.backend.set_value(self.model.optimizer.lr, lr_new)
 
-class LinearLR(tf.keras.callbacks.Callback):
-    def __init__(self,
-                 epoch_start,
-                 epoch_end,
-                 lr_start,
-                 lr_end,
-    ):
-        super(LinearLR, self).__init__()
-        self.epoch_start = epoch_start
-        self.epoch_end = epoch_end
-        self.lr_start = lr_start
-        self.lr_end = lr_end
+# class LinearLR(tf.keras.callbacks.Callback):
+#     def __init__(self,
+#                  epoch_start,
+#                  epoch_end,
+#                  lr_start,
+#                  lr_end,
+#     ):
+#         super(LinearLR, self).__init__()
+#         self.epoch_start = epoch_start
+#         self.epoch_end = epoch_end
+#         self.lr_start = lr_start
+#         self.lr_end = lr_end
 
-        self.step_start = epoch_start * steps_per_epoch
-        self.step_end = epoch_end * steps_per_epoch
+#         self.step_start = epoch_start * steps_per_epoch
+#         self.step_end = epoch_end * steps_per_epoch
 
     def on_train_batch_begin(self, batch, *args):
         step = int(tf.keras.backend.get_value(self.model.optimizer.iterations))
@@ -272,11 +313,11 @@ if train_settings['log_wandb']:
     callbacks.append(WandbCallback(save_model=False))
     callbacks.append(LearningRateReporter())
 
-if train_settings['lr_method'] == 'geometric':
-    callbacks.append(GeometricLR(*train_settings['lr_geometric']))
+# if train_settings['lr_method'] == 'geometric':
+#     callbacks.append(GeometricLR(*train_settings['lr_geometric']))
 
-elif train_settings['lr_method'] == 'linear':
-    callbacks.append(LinearLR(*train_settings['lr_linear']))
+# elif train_settings['lr_method'] == 'linear':
+#     callbacks.append(LinearLR(*train_settings['lr_linear']))
 
 #elif train_settings['lr_method'] == 'decay':
 #    for lr in train_settings['lr_decay']:

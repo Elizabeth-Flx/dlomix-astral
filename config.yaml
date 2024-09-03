@@ -1,7 +1,7 @@
 # large or small dataset
 
 dataloader:
-  dataset: full      # full | small
+  dataset: combined      # full | small
   batch_size: 2048   # default 2048
 #  save_path: /cmnfs/proj/prosit_astral/datasets/parquet
 
