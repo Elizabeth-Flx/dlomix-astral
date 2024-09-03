@@ -117,15 +117,16 @@ match config['dataloader']['dataset']:
         test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_test.parquet"
         steps_per_epoch = 21_263_168 / config['dataloader']['batch_size']
     case 'combined':
-        train_data_source = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing.parquet"
-        val_data_source =   "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing.parquet"
-        test_data_source =  "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing.parquet"
+        train_data_source = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing3.parquet"
+        val_data_source =   "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing3.parquet"
+        test_data_source =  "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing3.parquet"
         steps_per_epoch = 630_000 / config['dataloader']['batch_size']
 
 # Faster loading if dataset is already saved
 #if os.path.exists(config['dataloader']['save_path'] + '/dataset_dict.json') and (config['dataloader']['dataset'] != 'small'):
 #    int_data = load_processed_dataset(config['dataloader']['save_path'])
 #else:
+
 int_data = FragmentIonIntensityDataset(
     data_source=train_data_source,
     # val_data_source=val_data_source,
@@ -135,6 +136,7 @@ int_data = FragmentIonIntensityDataset(
     max_seq_len=30, 
     encoding_scheme="naive-mods",
     alphabet=CUSTOM_ALPHABET,
+    with_termini=False,
     model_features=["charge_oh", "collision_energy","method_nr_oh","machine_oh"],
     batch_size=config['dataloader']['batch_size']
 )
@@ -157,9 +159,6 @@ model.compile(optimizer=optimizer,
             loss=masked_spectral_distance,
             metrics=[masked_pearson_correlation_distance])
 inp = [m for m in int_data.tensor_train_data.take(1)][0][0]
-
-print(int_data.tensor_train_data.take(1)[0])
-print(int_data.tensor_train_data.take(1)[1])
 
 out = model(inp)
 model.summary()
