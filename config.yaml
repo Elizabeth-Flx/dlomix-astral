@@ -16,7 +16,6 @@ model_settings:
   alphabet: False
   dropout: 0.1
   integration_method: penult_add        # embed_input | multi_token | single_token | token_summation | inject | adaptive
-  token_combine: add
   norm_type: layer               # layer | batch | adaptive
   inject_pre: True          # inject before Attention block
   inject_post: False         # inject into FFN

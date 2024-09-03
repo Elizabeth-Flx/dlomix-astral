@@ -69,8 +69,6 @@ class TransformerModel(K.Model):
         self.inject_post = inject_post
         self.inject_position = inject_position
 
-        self.token_combine = token_combine
-
 
         # Positional Encoding 
         if learned_pos:
@@ -257,6 +255,5 @@ class TransformerModel(K.Model):
 
         # Final
         out = self.final(out)
-
         return tf.reduce_mean(out, axis=1)
 
