@@ -232,11 +232,12 @@ class TransformerModel(K.Model):
         print(meth_oh.shape)
         print(mach_oh.shape)
 
-        #out = self.EmbedInputs(sequence, precchar, collener)
+        # onehot encode sequence
+        out = tf.one_hot(tf.cast(sequence, tf.int32), len(ALPHABET_UNMOD))
 
         metadata = self.MetadataGenerator(char_oh, ener, meth_oh, mach_oh)
 
-        out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]
+        out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]  # todo check about this positional encoding (seems wierd)
 
         if self.integration_method in ['single_token', 'multi_token']:
             out = tf.concat([out, metadata], axis=1)
@@ -246,10 +247,13 @@ class TransformerModel(K.Model):
         # Penultimate 
         out = self.penultimate_dense(out)
 
+        print(out.shape)
+        print(metadata.shape)
+
         if self.integration_method == 'penult_sum':
-            out = out + metadata
+            out = out + metadata[:, None]
         elif self.integration_method == 'penult_mult':
-            out = out * metadata
+            out = out * metadata[:, None]
 
         out = self.penultimate_norm(out)
 
