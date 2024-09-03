@@ -41,7 +41,7 @@ class TransformerModel(K.Model):
         depth=3,
         pos_type='learned', # learned
         integration_method="embed_input", # embed_input | single_token | multi_token | inject
-        token_combine ='add',    # add | mult
+        # token_combine ='add',    # add | mult
         learned_pos=False,
         prenorm=True,
         norm_type="layer",      # layer | batch | adaptive
@@ -89,7 +89,7 @@ class TransformerModel(K.Model):
         penultimate_units = running_units if penultimate_units is None else penultimate_units
 
         # Metadata integration
-        if integration_method == 'embed_input':
+        if integration_method == 'multi_token':
             self.char_embedder = L.Dense(running_units) # this should be changed to its own variable
             self.ener_embedder = L.Dense(running_units) # this should be changed to its own variable (possibly change to fourier feature (PrecursorToken))
             self.meth_embedder = L.Dense(running_units) # this should be changed to its own variable
@@ -103,6 +103,8 @@ class TransformerModel(K.Model):
             self.metadata_encoder = L.Dense(2*depth)    # with alpha and beta (if only beta just depth)
         elif integration_method in ['penult_sum', 'penult_mult']:
             self.metadata_encoder = L.Dense(penultimate_units)
+        elif integration_method == 'embed_input': # todo add parameter to config that can choose if none given use ru
+            self.metadata_encoder = L.Dense(running_units)
 
         # Middle
         attention_dict = {
@@ -135,14 +137,8 @@ class TransformerModel(K.Model):
         ]
 
         # End
-
-        # reimplement this
-        if integration_method == 'penult_add':
-            self.meta_encoder = L.Dense(penultimate_units)
-            self.prepenult = L.Dense(penultimate_units)
-        
-        self.penultimate = K.Sequential([
-            *( [L.Dense(penultimate_units)] if integration_method != 'penult_add' else [] ),
+        self.penultimate_dense = L.Dense(penultimate_units)
+        self.penultimate_norm = K.Sequential([
             L.LayerNormalization(),
             L.ReLU()
         ])
@@ -243,46 +239,23 @@ class TransformerModel(K.Model):
         metadata = self.MetadataGenerator(char_oh, ener, meth_oh, mach_oh)
 
         out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]
-        
-
-        # # === Methods that alter the transformer tokens === #
-        # if self.integration_method in ['multi_token', 'single_token', 'token_sum', 'token_mult', 'FiLM_small', 'FiLM_large', 
-        #                                'inject', 'adaptive', 'penult_add', 'penult_mult']:
-        #     charge_token = self.charge_embedder(precchar)    # (bs, ru)
-        #     ce_token = self.ce_embedder(collener)            # (bs, ru)
-
-        #     if self.token_combine == 'add':
-        #         combined_token = (charge_token + ce_token)[:,None]      # (bs, 1, ru)
-        #     elif self.token_combine == 'mult':
-        #         combined_token = (charge_token * ce_token)[:,None]      # (bs, 1, ru)
-
-        # match self.integration_method:
-        #     case 'multi_token':
-        #         out = tf.concat([charge_token[:,None], ce_token[:,None], out], axis=1)
-        #     case 'single_token':
-        #         out = tf.concat([combined_token, out], axis=1)
-        #     case 'token_sum':
-        #         out = out + combined_token
-        #     case 'token_mult':
-        #         out = out * combined_token
-        #     case 'FiLM_small' | 'FiLM_large':
-        #         out = out * (self.film_gamma * combined_token) + self.film_beta * combined_token
-        #     case 'inject' | 'adaptive' | 'penult_add' | 'penult_mult':
-        #         tb_emb = tf.concat([charge_token, ce_token], axis=-1)   # (bs, 2*running_units)
-
 
         if self.integration_method in ['single_token', 'multi_token']:
             out = tf.concat([out, metadata], axis=1)
 
         out = self.Main(out, metadata)     # Transformer blocks
 
-        if self.integration_method == 'penult_add': # todo fix this part (what did i even do here)
-            out = self.prepenult(out) + self.meta_encoder(tb_emb)[:,None]
+        # Penultimate 
+        out = self.penultimate_dense(out)
+
+        if self.integration_method == 'penult_sum':
+            out = out + metadata
         elif self.integration_method == 'penult_mult':
-            out = self.prepenult(out) * self.meta_encoder(tb_emb)[:,None]
+            out = out * metadata
 
-        out = self.penultimate(out)
+        out = self.penultimate_norm(out)
 
+        # Final
         out = self.final(out)
 
         return tf.reduce_mean(out, axis=1)
