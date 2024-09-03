@@ -303,6 +303,8 @@ class TransBlock(L.Layer):
             self.embed = L.Dense(units)
     
     def call(self, x, kv_feats=None, temb=None, spec_mask=None, seq_mask=None):
+
+        
         selfmask = seq_mask if self.is_cross else spec_mask
         Temb = self.embed(temb)[:,None,:] if self.use_embed else 0          # (bs, 1, ru)
         
