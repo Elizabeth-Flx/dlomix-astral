@@ -46,7 +46,7 @@ print(f"List of GPUs available: {tf.config.list_physical_devices('GPU')}")
 print('='*32)
 
 
-with open("/nfs/home/students/d.lochert/projects/astral/dlomix-astral/config.yaml", 'r') as yaml_file:
+with open("/nfs/home/students/d.lochert/projects/astral/dlomix/my_scripts/config.yaml", 'r') as yaml_file:
     config = yaml.safe_load(yaml_file)
 
 model_settings = config['model_settings']
@@ -76,73 +76,38 @@ print('='*32)
 #                   Data Loader                   #
 ###################################################
 
-from dlomix.data import FragmentIonIntensityDataset
+full_data = pd.read_parquet('/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_broken_collision_energy.parquet')
 
-CUSTOM_ALPHABET = {
-    'A': 1,
-    'C': 2,
-    'D': 3,
-    'E': 4,
-    'F': 5,
-    'G': 6,
-    'H': 7,
-    'I': 8,
-    'K': 9,
-    'L': 10,
-    'M': 11,
-    'N': 12,
-    'P': 13,
-    'Q': 14,
-    'R': 15,
-    'S': 16,
-    'T': 17,
-    'V': 18,
-    'W': 19,
-    'Y': 20,
-    'm': 21, # oxidized methionine
-}
+# Shuffle data
+df = full_data.sample(frac=1, random_state=42)
 
-os.environ['HF_HOME'] = "/cmnfs/proj/prosit_astral"
-os.environ['HF_DATASETS_CACHE'] = "/cmnfs/proj/prosit_astral/datasets"
+def map_protein_sequence(seq):
+    return np.array([protein_map[aa] for aa in seq] + [0] * (MAX_SEQUENCE_LENGTH - len(seq)))
 
-match config['dataloader']['dataset']:
-    case 'small':
-        train_data_source = "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_train.parquet"
-        val_data_source =   "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_val.parquet"
-        test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_test.parquet"
-        steps_per_epoch = 7_992 / config['dataloader']['batch_size']
-    case 'full':
-        train_data_source = "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_train.parquet"
-        val_data_source =   "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_val.parquet"
-        test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_test.parquet"
-        steps_per_epoch = 21_263_168 / config['dataloader']['batch_size']
-    case 'combined':
-        train_data_source = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing3.parquet"
-        val_data_source =   "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing3.parquet"
-        test_data_source =  "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing3.parquet"
-        steps_per_epoch = 630_000 / config['dataloader']['batch_size']
+df['encoded_seqeunce'] = df['prosit_sequence'].apply(map_protein_sequence)
+df['precursor_charge_onehot'] = df['charge'].apply(lambda x: np.array([1 if i == x else 0 for i in range(1, 7)]))
 
-# Faster loading if dataset is already saved
-#if os.path.exists(config['dataloader']['save_path'] + '/dataset_dict.json') and (config['dataloader']['dataset'] != 'small'):
-#    int_data = load_processed_dataset(config['dataloader']['save_path'])
-#else:
+nrows = len(df)
 
-int_data = FragmentIonIntensityDataset(
-    data_source=train_data_source,
-    # val_data_source=val_data_source,
-    # test_data_source=test_data_source,
-    data_format="parquet", 
-    val_ratio=0.2, 
-    max_seq_len=30, 
-    encoding_scheme="naive-mods",
-    alphabet=CUSTOM_ALPHABET,
-    with_termini=False,
-    model_features=["charge_oh", "collision_energy","method_nr_oh","machine_oh"],
-    batch_size=config['dataloader']['batch_size']
-)
+print(nrows)
 
-print([m for m in int_data.tensor_train_data.take(1)][0][0])
-print([m for m in int_data.tensor_train_data.take(1)][0][1])
+# Split data into train, val and test
+train_data = df.iloc[               :int(nrows*0.8)]
+val_data   = df.iloc[int(nrows*0.8) :int(nrows*0.9)]
+test_data  = df.iloc[int(nrows*0.9) :]
+
+print("train", train_data.shape)
+print("val  ", val_data.shape)
+print("test ", test_data.shape)
+
+# transform dataframes to dictionaries
+train_data = train_data.to_dict('records')
+val_data   = val_data  .to_dict('records')
+test_data  = test_data .to_dict('records')
+
+# print("train", train_data[0])
+# print("val  ", val_data[0])
+# print("test ", test_data[0])
 
 
 
@@ -158,9 +123,8 @@ print("Compiling Transformer Model")
 model.compile(optimizer=optimizer, 
             loss=masked_spectral_distance,
             metrics=[masked_pearson_correlation_distance])
-inp = [m for m in int_data.tensor_train_data.take(1)][0][0]
-
-out = model(inp)
+#inp = [m for m in int_data.tensor_train_data.take(1)][0][0]
+out = model(train_data[0])
 model.summary()
 
 
