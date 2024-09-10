@@ -77,6 +77,10 @@ print('='*32)
 ###################################################
 
 from dlomix.data import FragmentIonIntensityDataset
+from dlomix.data import load_processed_dataset
+
+os.environ['HF_HOME'] = "/cmnfs/proj/prosit_astral"
+os.environ['HF_DATASETS_CACHE'] = "/cmnfs/proj/prosit_astral/datasets"
 
 CUSTOM_ALPHABET = {
     'A': 1,
@@ -117,34 +121,35 @@ match config['dataloader']['dataset']:
         test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_test.parquet"
         steps_per_epoch = 21_263_168 / config['dataloader']['batch_size']
     case 'combined':
-        train_data_source = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing3.parquet"
-        val_data_source =   "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing3.parquet"
-        test_data_source =  "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_testing3.parquet"
+        train_data_source = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_train.parquet"
+        val_data_source =   "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_val.parquet"
+        test_data_source =  "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_test.parquet"
         steps_per_epoch = 630_000 / config['dataloader']['batch_size']
 
 # Faster loading if dataset is already saved
-#if os.path.exists(config['dataloader']['save_path'] + '/dataset_dict.json') and (config['dataloader']['dataset'] != 'small'):
-#    int_data = load_processed_dataset(config['dataloader']['save_path'])
-#else:
+if config['dataloader']['load_data']:
+   int_data = FragmentIonIntensityDataset.load_from_disk("/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dataset")
+else:
+    int_data = FragmentIonIntensityDataset(
+        data_source=train_data_source,
+        val_data_source=val_data_source,
+        test_data_source=test_data_source,
+        data_format="parquet", 
+        # val_ratio=0.2, 
+        max_seq_len=30, 
+        encoding_scheme="naive-mods",
+        alphabet=CUSTOM_ALPHABET,
+        with_termini=False,
+        model_features=["charge_oh", "collision_energy","method_nr_oh","machine_oh"],
+        batch_size=config['dataloader']['batch_size']
+    )
 
-int_data = FragmentIonIntensityDataset(
-    data_source=train_data_source,
-    # val_data_source=val_data_source,
-    # test_data_source=test_data_source,
-    data_format="parquet", 
-    val_ratio=0.2, 
-    max_seq_len=30, 
-    encoding_scheme="naive-mods",
-    alphabet=CUSTOM_ALPHABET,
-    with_termini=False,
-    model_features=["charge_oh", "collision_energy","method_nr_oh","machine_oh"],
-    batch_size=config['dataloader']['batch_size']
-)
+
+
+#int_data.save_to_disk("combined_dlomix.pt")
 
 print([m for m in int_data.tensor_train_data.take(1)][0][0])
 print([m for m in int_data.tensor_train_data.take(1)][0][1])
-
-
 
 from models.models import TransformerModel
 
@@ -164,10 +169,10 @@ out = model(inp)
 model.summary()
 
 
-# stop code
-raise Exception('Stop code') 
+print(len(int_data.tensor_train_data))
 
-# print(len(int_data.tensor_train_data))
+# stop code
+# raise Exception('Stop code') 
 
 ###################################################
 #                   Wandb init                    #

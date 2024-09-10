@@ -2,25 +2,26 @@
 
 dataloader:
   dataset: combined      # full | small
-  batch_size: 2048   # default 2048
-#  save_path: /cmnfs/proj/prosit_astral/datasets/parquet
+  batch_size: 1024   # default 2048
+  load_data: True
 
 model_type: ours
 model_settings:
   running_units: 256          # 256
   d: 64                       # 64
   h: 6                        # 6
-  depth: 3                    # 8         
+  depth: 3                    # 10 | 3     
   ffn_mult: 1
   penultimate_units: 512
   alphabet: False
   dropout: 0.1
-  integration_method: FiLM_reduced        # embed_input | multi_token | single_token | token_summation | inject | adaptive
+  integration_method: FiLM_full        # embed_input | multi_token | single_token | token_summation | inject | adaptive
   norm_type: layer               # layer | batch | adaptive
   inject_pre: True          # inject before Attention block
   inject_post: False         # inject into FFN
   inject_position: all      # all | first | last | none
   learned_pos: False
+  identiy_metadata: False
 
 prosit:
   model_d: 128 # 64
@@ -37,9 +38,8 @@ prosit:
   
 
 train_settings:
-  epochs: 10
+  epochs: 50
   lr_base: 0.0005
-
   lr_method: static      # static | geometric | linear
   
   lr_geometric: [5, 0.0005, 0.5, 1]
@@ -50,5 +50,5 @@ train_settings:
 
 wandb_settings:
   log_wandb: True
-  name: None
-  project: 18-06_Benchmark
+  # name: test_run
+  project: combined_data_identity_testing

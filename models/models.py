@@ -1,6 +1,8 @@
 import tensorflow as tf
 K = tf.keras
 L = K.layers
+I = K.initializers
+
 import models.model_parts as mp
 import numpy as np
 
@@ -55,7 +57,8 @@ class TransformerModel(K.Model):
         inject_pre=True,        # inject before Attention block
         inject_post=True,       # inject into FNN
         inject_position="all",  # all | first | last
-        seed=42
+        seed=42,
+        identiy_metadata=False,
     ):
         tf.random.set_seed(seed)
 
@@ -86,23 +89,36 @@ class TransformerModel(K.Model):
 
         penultimate_units = running_units if penultimate_units is None else penultimate_units
 
+        
+        self.meta_dense = L.Dense(running_units)    # intermediate dense
+
+        if identiy_metadata:
+            self.mult_factor = 1
+            self.meta_weight_init = I.Zeros()
+        else:
+            self.mult_factor = 0
+            self.meta_weight_init = I.GlorotNormal()
+        
+
         # Metadata integration
         if integration_method == 'multi_token':
-            self.char_embedder = L.Dense(running_units) # this should be changed to its own variable
-            self.ener_embedder = L.Dense(running_units) # this should be changed to its own variable (possibly change to fourier feature (PrecursorToken))
-            self.meth_embedder = L.Dense(running_units) # this should be changed to its own variable
-            self.mach_embedder = L.Dense(running_units) # this should be changed to its own variable
+            self.char_embedder = L.Dense(running_units, kernel_initializer=self.meta_weight_init) # this should be changed to its own variable
+            self.ener_embedder = L.Dense(running_units, kernel_initializer=self.meta_weight_init) # this should be changed to its own variable (possibly change to fourier feature (PrecursorToken))
+            self.meth_embedder = L.Dense(running_units, kernel_initializer=self.meta_weight_init) # this should be changed to its own variable
+            self.mach_embedder = L.Dense(running_units, kernel_initializer=self.meta_weight_init) # this should be changed to its own variable
         
         elif integration_method in ['single_token', 'token_sum', 'token_mult', 'inject_a', 'inject_s', 'inject_e']:
-            self.metadata_encoder = L.Dense(running_units)
+            self.metadata_encoder = L.Dense(running_units, kernel_initializer=self.meta_weight_init)
         elif integration_method == 'FiLM_full':
-            self.metadata_encoder = L.Dense(running_units*2*depth)
+            self.metadata_encoder = L.Dense(running_units*2*depth, kernel_initializer=self.meta_weight_init)
         elif integration_method == 'FiLM_reduced':
-            self.metadata_encoder = L.Dense(2*depth)    # with alpha and beta (if only beta just depth)
+            self.metadata_encoder = L.Dense(2*depth, kernel_initializer=self.meta_weight_init)    # with alpha and beta (if only beta just depth)
         elif integration_method in ['penult_sum', 'penult_mult']:
-            self.metadata_encoder = L.Dense(penultimate_units)
+            self.metadata_encoder = L.Dense(penultimate_units, kernel_initializer=self.meta_weight_init)
         elif integration_method == 'embed_input': # todo add parameter to config that can choose if none given use ru
-            self.metadata_encoder = L.Dense(running_units)
+            self.metadata_encoder = L.Dense(running_units, kernel_initializer=self.meta_weight_init)
+        elif integration_method in ['FiLM_sum', 'FiLM_mult']:
+            self.metadata_encoder = L.Dense(running_units*depth, kernel_initializer=self.meta_weight_init)
 
         # Middle
         attention_dict = {
@@ -143,30 +159,6 @@ class TransformerModel(K.Model):
         
         self.final = L.Dense(output_units, activation='sigmoid')
 
-
-    # remove??? or atleast rename, not really required anymore
-    def EmbedInputs(self, sequence, precursor_charge, collision_energy):
-        #print(sequence)
-        length = sequence.shape[1]
-        #input_embedding = tf.one_hot(self.string_lookup(sequence), len(ALPHABET_UNMOD))
-        input_embedding = tf.one_hot(tf.cast(sequence, tf.int32), len(ALPHABET_UNMOD))
-        if self.integration_method == 'embed_input':
-            #print(precursor_charge.shape)
-            #print(precursor_charge[:,None].shape)
-            charge_emb = tf.tile(precursor_charge[:,None], [1, length, 1])          # (bs, 1, 6)
-            #print(charge_emb.shape)
-            #print(collision_energy.shape)
-            #print(collision_energy[:,None][:,None].shape)
-            ce_emb = tf.tile(collision_energy[:,None][:,None], [1, length, 1])      # (bs, 1, 1)
-            #print(ce_emb.shape)
-
-            input_embedding = tf.concat([input_embedding, tf.cast(charge_emb, tf.float32), ce_emb], axis=-1)
-        
-        return input_embedding
-    
-
-
-
     
     def MetadataGenerator(self, char_oh, ener, meth_oh, mach_oh): # todo rename
 
@@ -177,12 +169,6 @@ class TransformerModel(K.Model):
             meth_token = self.meth_embedder(meth_oh)        [:, None]   # (bs, 1, ru)
             mach_token = self.mach_embedder(mach_oh)        [:, None]   # (bs, 1, ru)
 
-            print("======")
-            print(char_token.shape)
-            print(ener_token.shape)
-            print(meth_token.shape)
-            print(mach_token.shape)
-
             return tf.concat([char_token, ener_token, meth_token, mach_token], axis=1)  # (bs, 4, ru)
 
         # all other methods require consolidated outputs (generated by MetaEmbedder)
@@ -191,32 +177,32 @@ class TransformerModel(K.Model):
 
 
     # If we want to add more layers in the metadata encoding do it here
-    def MetaEnocoder(self, x): # todo rename
-        return self.metadata_encoder(x)
+    def MetaEnocoder(self, x): # todo rename/merge with MetadataGenerator
+        x = self.meta_dense(x)
+        return self.metadata_encoder(x)[:, None]
 
 
 
     def Main(self, x, metadata=None):     # todo alter to work with integration methods
         out = x
 
-        metadata = metadata[:, None]
-
-        if self.integration_method in ['FiLM_full', 'FiLM_reduced']:
+        if self.integration_method in ['FiLM_full', 'FiLM_reduced', 'FiLM_sum', 'FiLM_mult']:
             metadata = tf.split(metadata, self.depth, axis=-1)
 
         for i in range(len(self.main)):
             layer = self.main[i]
 
-            print(out.shape)
-            #print(metadata.shape)
-
             if self.integration_method in ['FiLM_full', 'FiLM_reduced']:
                 gamma, beta = tf.split(metadata[i], 2, axis=-1)
-                out = out*gamma + beta
+                out = out * (gamma + self.mult_factor) + beta
             elif self.integration_method == 'token_sum':    # these should have a gate variable alpha 
                 out = out + metadata
             elif self.integration_method == 'token_mult':
-                out = out * metadata
+                out = out * (metadata + self.mult_factor)
+            elif self.integration_method == 'FiLM_sum':
+                out = out + metadata[i]
+            elif self.integration_method == 'FiLM_mult':
+                out = out * (metadata[i] + self.mult_factor)
             
             out = layer(out, None) # todo maybe implement inject? (low prio)
 
@@ -238,10 +224,10 @@ class TransformerModel(K.Model):
         meth_oh = x['method_nr_oh']
         mach_oh = x['machine_oh']
 
-        print(char_oh.shape)
-        print(ener   .shape)
-        print(meth_oh.shape)
-        print(mach_oh.shape)
+        # print(char_oh.shape)
+        # print(ener   .shape)
+        # print(meth_oh.shape)
+        # print(mach_oh.shape)
 
         # onehot encode sequence
         out = tf.one_hot(tf.cast(sequence, tf.int32), len(ALPHABET_UNMOD))
@@ -250,9 +236,7 @@ class TransformerModel(K.Model):
 
         out = self.first(out) + self.alpha_pos*self.pos[:out.shape[1]]  # todo check about this positional encoding (seems wierd)
 
-        if self.integration_method == 'single_token':           # todo make this better (low prio)
-            out = tf.concat([out, metadata[:, None]], axis=1)
-        elif self.integration_method == 'multi_token':
+        if self.integration_method in ['single_token', 'multi_token']:           # todo make this better (low prio)
             out = tf.concat([out, metadata], axis=1)
 
         out = self.Main(out, metadata)     # Transformer blocks
@@ -273,4 +257,20 @@ class TransformerModel(K.Model):
         # Final
         out = self.final(out)
         return tf.reduce_mean(out, axis=1)
+    
+
+    def get_meta_vector(self, x):
+        sequence = x['modified_sequence']
+        char_oh = x['charge_oh']
+        ener    = x['collision_energy']
+        meth_oh = x['method_nr_oh']
+        mach_oh = x['machine_oh']
+
+        # onehot encode sequence
+        out = tf.one_hot(tf.cast(sequence, tf.int32), len(ALPHABET_UNMOD))
+
+        metadata = self.MetadataGenerator(char_oh, ener, meth_oh, mach_oh)
+
+        return metadata     # (bs, variable, ru/penult_units)
+
 
