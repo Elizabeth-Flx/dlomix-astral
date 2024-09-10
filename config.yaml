@@ -10,7 +10,7 @@ model_settings:
   running_units: 256          # 256
   d: 64                       # 64
   h: 6                        # 6
-  depth: 3                    # 10 | 3     
+  depth: 10                    # 10 | 3     
   ffn_mult: 1
   penultimate_units: 512
   alphabet: False
@@ -21,24 +21,10 @@ model_settings:
   inject_post: False         # inject into FFN
   inject_position: all      # all | first | last | none
   learned_pos: False
-  identiy_metadata: False
-
-prosit:
-  model_d: 128 # 64
-  embedding_output_dim: 32 # 64
-  ff_dim: 256 # 32
-  num_heads: 16 # 16
-  num_transformers: 6 # 8
-  penult_d: 512 # 256
-  len_fion: 6 # 6
-  dense_dim_factor: 8 # 8
-  dropout_rate: 0 # 0
-  seq_length: 30 # 30
-  transformer_dropout: 0 # 0.1
-  
+  identiy_metadata: True
 
 train_settings:
-  epochs: 50
+  epochs: 20
   lr_base: 0.0005
   lr_method: static      # static | geometric | linear
   
