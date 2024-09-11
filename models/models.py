@@ -107,7 +107,7 @@ class TransformerModel(K.Model):
         else:
             self.meta_dense = L.Dense(running_units)
         
-            if integration_method in ['single_token', 'token_sum', 'token_mult', 'inject_a', 'inject_s', 'inject_e']:
+            if integration_method in ['single_token', 'token_sum', 'token_mult']:
                 self.metadata_encoder = L.Dense(running_units, kernel_initializer=self.meta_weight_init)
             elif integration_method == 'FiLM_full':
                 self.metadata_encoder = L.Dense(running_units*2*depth, kernel_initializer=self.meta_weight_init)
@@ -132,7 +132,7 @@ class TransformerModel(K.Model):
             'dropout': dropout,
             'alphabet': alphabet,
         }
-        self.main = [ # todo remove adaptive norm idea
+        self.main = [ # todo remove adaptive norm idea and iject
             mp.TransBlock(
                 attention_dict, 
                 ffn_dict, 

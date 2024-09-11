@@ -226,6 +226,7 @@ if train_settings['log_wandb']:
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 #from callbacks import CyclicLR, LearningRateLogging
 
+
 early_stopping = EarlyStopping(
     monitor="val_loss",
     min_delta=0.001,
@@ -233,13 +234,8 @@ early_stopping = EarlyStopping(
     restore_best_weights=True)
 
 # ValueError: When using `save_weights_only=True` in `ModelCheckpoint`, the filepath provided must end in `.weights.h5` (Keras weights format). Received: filepath=saved_models/best_model_intensity_nan.keras
-save_best = ModelCheckpoint(
-    'saved_models/best_model_intensity_nan.keras',
-    monitor="val_loss",
-    verbose=1,
-    save_best_only=True,
-    save_weights_only=True
-)
+os.makedirs('/nfs/home/students/d.lochert/projects/astral/dlomix-astral/saved_models/%s' % name, exist_ok=True)
+save_all_epochs = ModelCheckpoint('/nfs/home/students/d.lochert/projects/astral/dlomix-astral/saved_models/%s/%s.keras' % (name,name))
 
 #cyclicLR = CyclicLR(
 #    base_lr=train_settings['lr_base'],
@@ -316,7 +312,8 @@ class LearningRateReporter(tf.keras.callbacks.Callback):
 callbacks = []
 if train_settings['log_wandb']:
     callbacks.append(WandbCallback(save_model=False))
-    callbacks.append(LearningRateReporter())
+    callbacks.append(LearningRateReporter()) 
+    callbacks.append(save_all_epochs)           # todo make this toggleable with config
 
 # if train_settings['lr_method'] == 'geometric':
 #     callbacks.append(GeometricLR(*train_settings['lr_geometric']))
