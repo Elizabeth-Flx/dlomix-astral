@@ -186,8 +186,9 @@ import random
 from string import ascii_lowercase, ascii_uppercase, digits
 chars = ascii_lowercase + ascii_uppercase + digits
 
-name = f"%s_%s%s_d%s_%s_%s_%s" % ( 
+name = f"%s_%s_%s%s_d%s_%s_%s_%s" % ( 
     config['dataloader']['dataset'][0],
+    'i' if model_settings['identiy_metadata'] else 'r',
     model_settings['integration_method'],
     (str(model_settings['inject_pre'])[0] +  str(model_settings['inject_post'])[0] + model_settings['inject_position'])
         if model_settings['integration_method']=='inject' else "",

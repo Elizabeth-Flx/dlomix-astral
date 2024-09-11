@@ -89,8 +89,6 @@ class TransformerModel(K.Model):
 
         penultimate_units = running_units if penultimate_units is None else penultimate_units
 
-        
-        self.meta_dense = L.Dense(running_units)    # intermediate dense
 
         if identiy_metadata:
             self.mult_factor = 1
@@ -106,19 +104,21 @@ class TransformerModel(K.Model):
             self.ener_embedder = L.Dense(running_units, kernel_initializer=self.meta_weight_init) # this should be changed to its own variable (possibly change to fourier feature (PrecursorToken))
             self.meth_embedder = L.Dense(running_units, kernel_initializer=self.meta_weight_init) # this should be changed to its own variable
             self.mach_embedder = L.Dense(running_units, kernel_initializer=self.meta_weight_init) # this should be changed to its own variable
+        else:
+            self.meta_dense = L.Dense(running_units)
         
-        elif integration_method in ['single_token', 'token_sum', 'token_mult', 'inject_a', 'inject_s', 'inject_e']:
-            self.metadata_encoder = L.Dense(running_units, kernel_initializer=self.meta_weight_init)
-        elif integration_method == 'FiLM_full':
-            self.metadata_encoder = L.Dense(running_units*2*depth, kernel_initializer=self.meta_weight_init)
-        elif integration_method == 'FiLM_reduced':
-            self.metadata_encoder = L.Dense(2*depth, kernel_initializer=self.meta_weight_init)    # with alpha and beta (if only beta just depth)
-        elif integration_method in ['penult_sum', 'penult_mult']:
-            self.metadata_encoder = L.Dense(penultimate_units, kernel_initializer=self.meta_weight_init)
-        elif integration_method == 'embed_input': # todo add parameter to config that can choose if none given use ru
-            self.metadata_encoder = L.Dense(running_units, kernel_initializer=self.meta_weight_init)
-        elif integration_method in ['FiLM_sum', 'FiLM_mult']:
-            self.metadata_encoder = L.Dense(running_units*depth, kernel_initializer=self.meta_weight_init)
+            if integration_method in ['single_token', 'token_sum', 'token_mult', 'inject_a', 'inject_s', 'inject_e']:
+                self.metadata_encoder = L.Dense(running_units, kernel_initializer=self.meta_weight_init)
+            elif integration_method == 'FiLM_full':
+                self.metadata_encoder = L.Dense(running_units*2*depth, kernel_initializer=self.meta_weight_init)
+            elif integration_method == 'FiLM_reduced':
+                self.metadata_encoder = L.Dense(2*depth, kernel_initializer=self.meta_weight_init)    # with alpha and beta (if only beta just depth)
+            elif integration_method in ['penult_sum', 'penult_mult']:
+                self.metadata_encoder = L.Dense(penultimate_units, kernel_initializer=self.meta_weight_init)
+            elif integration_method == 'embed_input': # todo add parameter to config that can choose if none given use ru
+                self.metadata_encoder = L.Dense(running_units, kernel_initializer=self.meta_weight_init)
+            elif integration_method in ['FiLM_sum', 'FiLM_mult']:
+                self.metadata_encoder = L.Dense(running_units*depth, kernel_initializer=self.meta_weight_init)
 
         # Middle
         attention_dict = {
