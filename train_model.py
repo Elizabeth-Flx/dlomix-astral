@@ -234,8 +234,8 @@ early_stopping = EarlyStopping(
     restore_best_weights=True)
 
 # ValueError: When using `save_weights_only=True` in `ModelCheckpoint`, the filepath provided must end in `.weights.h5` (Keras weights format). Received: filepath=saved_models/best_model_intensity_nan.keras
-os.makedirs('/nfs/home/students/d.lochert/projects/astral/dlomix-astral/saved_models/%s' % name, exist_ok=True)
-save_all_epochs = ModelCheckpoint('/nfs/home/students/d.lochert/projects/astral/dlomix-astral/saved_models/%s/{loss:.4f}_%s.keras' % (name,name),
+os.makedirs('/cmnfs/proj/prosit_astral/saved_models/%s' % name, exist_ok=True)
+save_all_epochs = ModelCheckpoint('/cmnfs/proj/prosit_astral/saved_models/%s/{loss:.4f}_%s.keras' % (name,name),
                                   save_freq=100,)
 
 #cyclicLR = CyclicLR(

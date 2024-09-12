@@ -24,7 +24,7 @@ model_settings:
   identiy_metadata: True
 
 train_settings:
-  epochs: 5      # 20
+  epochs: 20      # 20
   lr_base: 0.0005
   lr_method: static      # static | geometric | linear
   
