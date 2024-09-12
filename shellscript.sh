@@ -6,7 +6,7 @@
 #SBATCH -D ./
 #SBATCH --get-user-env
 
-# SBATCH --partition=shared-gpu          # compms-cpu-small | shared-gpu | exbio-gpu
+# SBATCH --partition=exbio-gpu          # compms-cpu-small | shared-gpu | exbio-gpu
 # #SBATCH --nodelist=gpu02.exbio.wzw.tum.de
 # SBATCH --nodes=1
 # SBATCH --gpus-per-node=2
