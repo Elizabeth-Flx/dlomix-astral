@@ -21,10 +21,10 @@ model_settings:
   inject_post: False         # inject into FFN
   inject_position: all      # all | first | last | none
   learned_pos: False
-  identiy_metadata: False
+  identiy_metadata: True
 
 train_settings:
-  epochs: 20
+  epochs: 20      # 20
   lr_base: 0.0005
   lr_method: static      # static | geometric | linear
   
