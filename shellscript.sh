@@ -22,8 +22,6 @@
 #SBATCH --mem=50G
 #SBATCH --tasks-per-node=1
 
-##SBATCH --mail-user=ge63sev@tum.de
-##SBATCH --mail-type=end
 #SBATCH --export=NONE
 #SBATCH --time=96:00:00
 ##SBATCH --array=1-100%3
