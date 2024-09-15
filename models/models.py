@@ -245,9 +245,9 @@ class TransformerModel(K.Model):
         out = self.penultimate_dense(out)
 
         if self.integration_method == 'penult_sum':
-            out = out + metadata[:, None]
+            out = out + metadata
         elif self.integration_method == 'penult_mult':
-            out = out * metadata[:, None]
+            out = out * metadata
 
         out = self.penultimate_norm(out)
 

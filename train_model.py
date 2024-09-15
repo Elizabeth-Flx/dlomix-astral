@@ -148,8 +148,8 @@ else:
 
 #int_data.save_to_disk("combined_dlomix.pt")
 
-print([m for m in int_data.tensor_train_data.take(1)][0][0])
-print([m for m in int_data.tensor_train_data.take(1)][0][1])
+# print([m for m in int_data.tensor_train_data.take(1)][0][0])
+# print([m for m in int_data.tensor_train_data.take(1)][0][1])
 
 from models.models import TransformerModel
 
