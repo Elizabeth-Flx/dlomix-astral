@@ -171,8 +171,6 @@ model.summary()
 
 print(len(int_data.tensor_train_data))
 
-# stop code
-# raise Exception('Stop code') 
 
 ###################################################
 #                   Wandb init                    #

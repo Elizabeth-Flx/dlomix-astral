@@ -10,12 +10,12 @@ model_settings:
   running_units: 256          # 256
   d: 64                       # 64
   h: 6                        # 6
-  depth: 10                    # 10 | 3     
+  depth: 5                    # 10 | 3     
   ffn_mult: 1 
   penultimate_units: 512
   alphabet: False
   dropout: 0.1
-  integration_method: penult_mult        # embed_input | multi_token | single_token | token_summation | inject | adaptive
+  integration_method: FiLM_reduced        # embed_input | multi_token | single_token | token_summation | inject | adaptive
   norm_type: layer               # layer | batch | adaptive
   inject_pre: True          # inject before Attention block
   inject_post: False         # inject into FFN
@@ -24,7 +24,7 @@ model_settings:
   identiy_metadata: False
 
 train_settings:
-  epochs: 20      # 20
+  epochs: 50      # 20
   lr_base: 0.0005
   lr_method: static      # static | geometric | linear
   
@@ -37,4 +37,4 @@ train_settings:
 wandb_settings:
   log_wandb: True
   # name: test_run
-  project: combined_data_identity_testing
+  project: long_test
