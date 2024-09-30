@@ -114,21 +114,38 @@ match config['dataloader']['dataset']:
         train_data_source = "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_train.parquet"
         val_data_source =   "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_val.parquet"
         test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_test.parquet"
-        steps_per_epoch = 7_992 / config['dataloader']['batch_size']
+        # steps_per_epoch = 7_992 / config['dataloader']['batch_size']
     case 'full':
-        train_data_source = "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_train.parquet"
-        val_data_source =   "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_val.parquet"
-        test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug_test.parquet"
-        steps_per_epoch = 21_263_168 / config['dataloader']['batch_size']
-    case 'combined':
-        train_data_source = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_train.parquet"
-        val_data_source =   "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_val.parquet"
-        test_data_source =  "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dlomix_format_test.parquet"
-        steps_per_epoch = 630_000 / config['dataloader']['batch_size']
+        train_data_source = "/cmnfs/proj/prosit_astral/datasets/full_dlomix_format_train.parquet"
+        val_data_source =   "/cmnfs/proj/prosit_astral/datasets/full_dlomix_format_val.parquet"
+        test_data_source =  "/cmnfs/proj/prosit_astral/datasets/full_dlomix_format_test.parquet"
+        saved_path = "/cmnfs/proj/prosit_astral/datasets/_dlomix_saved/full_dataset"
+        # steps_per_epoch = 21_263_168 / config['dataloader']['batch_size']
+    case 'balanced': # formerly combined
+        train_data_source = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/balanced_dlomix_format_train.parquet"
+        val_data_source =   "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/balanced_dlomix_format_val.parquet"
+        test_data_source =  "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/balanced_dlomix_format_test.parquet"
+        saved_path = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/balanced_dataset"
+        # steps_per_epoch = 630_000 / config['dataloader']['batch_size']
+    case 'astral':
+        train_data_source = "/cmnfs/proj/prosit_astral/datasets/astral_dlomix_format_train.parquet"
+        val_data_source =   "/cmnfs/proj/prosit_astral/datasets/astral_dlomix_format_val.parquet"
+        test_data_source =  "/cmnfs/proj/prosit_astral/datasets/astral_dlomix_format_test.parquet"
+        saved_path = "/cmnfs/proj/prosit_astral/datasets/_dlomix_saved/astral_dataset"
+    case 'timsTOF':
+        train_data_source = "/cmnfs/proj/prosit_astral/datasets/timsTOF_dlomix_format_train.parquet"
+        val_data_source =   "/cmnfs/proj/prosit_astral/datasets/timsTOF_dlomix_format_val.parquet"
+        test_data_source =  "/cmnfs/proj/prosit_astral/datasets/timsTOF_dlomix_format_test.parquet"
+        saved_path = "/cmnfs/proj/prosit_astral/datasets/_dlomix_saved/timsTOF_dataset"
+    case 'proteome_tools':
+        train_data_source = "/cmnfs/proj/prosit_astral/datasets/proteome_tools_dlomix_format_train.parquet"
+        val_data_source =   "/cmnfs/proj/prosit_astral/datasets/proteome_tools_dlomix_format_val.parquet"
+        test_data_source =  "/cmnfs/proj/prosit_astral/datasets/proteome_tools_dlomix_format_test.parquet"
+        saved_path = "/cmnfs/proj/prosit_astral/datasets/_dlomix_saved/proteome_tools_dataset"
 
 # Faster loading if dataset is already saved
 if config['dataloader']['load_data']:
-   int_data = FragmentIonIntensityDataset.load_from_disk("/nfs/home/students/d.lochert/projects/astral/dlomix-astral/combined_dataset")
+   int_data = FragmentIonIntensityDataset.load_from_disk(saved_path)
 else:
     int_data = FragmentIonIntensityDataset(
         data_source=train_data_source,
@@ -143,10 +160,14 @@ else:
         model_features=["charge_oh", "collision_energy","method_nr_oh","machine_oh"],
         batch_size=config['dataloader']['batch_size']
     )
+    int_data.save_to_disk(saved_path)
 
 
 
-#int_data.save_to_disk("combined_dlomix.pt")
+
+
+
+
 
 # print([m for m in int_data.tensor_train_data.take(1)][0][0])
 # print([m for m in int_data.tensor_train_data.take(1)][0][1])
@@ -234,7 +255,7 @@ early_stopping = EarlyStopping(
 # ValueError: When using `save_weights_only=True` in `ModelCheckpoint`, the filepath provided must end in `.weights.h5` (Keras weights format). Received: filepath=saved_models/best_model_intensity_nan.keras
 os.makedirs('/cmnfs/proj/prosit_astral/saved_models/%s' % name, exist_ok=True)
 save_all_epochs = ModelCheckpoint('/cmnfs/proj/prosit_astral/saved_models/%s/{loss:.4f}_%s.keras' % (name,name),
-                                  save_freq=100,)
+                                  save_freq=1000,)
 
 #cyclicLR = CyclicLR(
 #    base_lr=train_settings['lr_base'],

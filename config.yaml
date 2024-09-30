@@ -1,9 +1,9 @@
 # large or small dataset
 
 dataloader:
-  dataset: combined      # full | small
+  dataset: proteome_tools      # full | small
   batch_size: 1024   # default 2048
-  load_data: True
+  load_data: False
 
 model_type: ours
 model_settings:
@@ -15,7 +15,7 @@ model_settings:
   penultimate_units: 512
   alphabet: False
   dropout: 0.1
-  integration_method: FiLM_reduced        # embed_input | multi_token | single_token | token_summation | inject | adaptive
+  integration_method: single_both        # embed_input | multi_token | single_token | token_summation | inject | adaptive
   norm_type: layer               # layer | batch | adaptive
   inject_pre: True          # inject before Attention block
   inject_post: False         # inject into FFN
@@ -24,7 +24,7 @@ model_settings:
   identiy_metadata: False
 
 train_settings:
-  epochs: 50      # 20
+  epochs: 20      # 20
   lr_base: 0.0005
   lr_method: static      # static | geometric | linear
   
@@ -37,4 +37,4 @@ train_settings:
 wandb_settings:
   log_wandb: True
   # name: test_run
-  project: long_test
+  project: full_vs_balanced
