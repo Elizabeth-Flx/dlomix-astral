@@ -116,21 +116,21 @@ match config['dataloader']['dataset']:
         test_data_source =  "/cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean_test.parquet"
         # steps_per_epoch = 7_992 / config['dataloader']['batch_size']
     case 'full':
-        train_data_source = "/cmnfs/proj/prosit_astral/datasets/full_dlomix_format_train.parquet"
-        val_data_source =   "/cmnfs/proj/prosit_astral/datasets/full_dlomix_format_val.parquet"
-        test_data_source =  "/cmnfs/proj/prosit_astral/datasets/full_dlomix_format_test.parquet"
+        train_data_source = "/cmnfs/proj/prosit_astral/datasets/full_dlomix_format_train_fixed.parquet"
+        val_data_source =   "/cmnfs/proj/prosit_astral/datasets/full_dlomix_format_val_fixed.parquet"
+        test_data_source =  "/cmnfs/proj/prosit_astral/datasets/full_dlomix_format_test_fixed.parquet"
         saved_path = "/cmnfs/proj/prosit_astral/datasets/_dlomix_saved/full_dataset"
         # steps_per_epoch = 21_263_168 / config['dataloader']['batch_size']
     case 'balanced': # formerly combined
-        train_data_source = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/balanced_dlomix_format_train.parquet"
-        val_data_source =   "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/balanced_dlomix_format_val.parquet"
-        test_data_source =  "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/balanced_dlomix_format_test.parquet"
+        train_data_source = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/balanced_dlomix_format_train_fixed.parquet"
+        val_data_source =   "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/balanced_dlomix_format_val_fixed.parquet"
+        test_data_source =  "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/balanced_dlomix_format_test_fixed.parquet"
         saved_path = "/nfs/home/students/d.lochert/projects/astral/dlomix-astral/balanced_dataset"
         # steps_per_epoch = 630_000 / config['dataloader']['batch_size']
     case 'astral':
-        train_data_source = "/cmnfs/proj/prosit_astral/datasets/astral_dlomix_format_train.parquet"
-        val_data_source =   "/cmnfs/proj/prosit_astral/datasets/astral_dlomix_format_val.parquet"
-        test_data_source =  "/cmnfs/proj/prosit_astral/datasets/astral_dlomix_format_test.parquet"
+        train_data_source = "/cmnfs/proj/prosit_astral/datasets/astral_dlomix_format_train_fixed.parquet"
+        val_data_source =   "/cmnfs/proj/prosit_astral/datasets/astral_dlomix_format_val_fixed.parquet"
+        test_data_source =  "/cmnfs/proj/prosit_astral/datasets/astral_dlomix_format_test_fixed.parquet"
         saved_path = "/cmnfs/proj/prosit_astral/datasets/_dlomix_saved/astral_dataset"
     case 'timsTOF':
         train_data_source = "/cmnfs/proj/prosit_astral/datasets/timsTOF_dlomix_format_train.parquet"
@@ -161,6 +161,8 @@ else:
         batch_size=config['dataloader']['batch_size']
     )
     int_data.save_to_disk(saved_path)
+
+    raise ValueError("Data saved to disk")
 
 
 
