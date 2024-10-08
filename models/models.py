@@ -177,7 +177,16 @@ class TransformerModel(K.Model):
         combined_meta = tf.concat([char_oh, meth_oh, mach_oh, ener[:, None]], axis=1) # (bs, 6+2+3+1)
 
         # ablation study
-        #combined_meta = tf.concat([char_oh, ener[:, None]], axis=1) # (bs, 6+2+3+1)
+        combined_meta = tf.concat([char_oh], axis=1) # (bs, 6+2+3+1)
+
+        # print(combined_meta)
+        # print(combined_meta.shape)
+
+        # control study with no metadata
+        # if combined_meta.shape[0] == None:
+        #     combined_meta = tf.zeros((1, 12))
+        # else:
+        #     combined_meta = tf.zeros((combined_meta.shape[0], 12))
 
         return self.MetaEnocoder(combined_meta)
 
@@ -212,7 +221,7 @@ class TransformerModel(K.Model):
             elif self.integration_method == 'single_both' and i==0:
                 alpha, beta = tf.split(metadata, 2, axis=-1)
                 out = out * (alpha + self.mult_factor) + beta
-            
+
             out = layer(out, None) # todo maybe implement inject? (low prio)
 
 

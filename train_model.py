@@ -369,4 +369,4 @@ print(f"Training Loss: {train_loss:.4f}")
 val_loss, val_accuracy = model.evaluate(int_data.tensor_val_data, verbose=0)
 print(f"Validation Loss: {val_loss:.4f}")
 
-model.save('/nfs/home/students/d.lochert/projects/astral/dlomix-astral/saved_models/%s.keras' % name)
+model.save('/cmnfs/proj/prosit_astral/saved_models/final_models/%s.keras' % name)

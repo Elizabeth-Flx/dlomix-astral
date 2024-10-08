@@ -7,7 +7,7 @@
 #SBATCH --get-user-env
 
 
-#SBATCH --partition=shared-gpu            # compms-cpu-small | shared-gpu
+#SBATCH --partition=exbio-gpu            # compms-cpu-small | shared-gpu
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=4
