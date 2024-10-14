@@ -1,7 +1,7 @@
 # large or small dataset
 
 dataloader:
-  dataset: balanced      # full | small
+  dataset: full      # full | small
   batch_size: 1024   # default 2048
   load_data: True
 
