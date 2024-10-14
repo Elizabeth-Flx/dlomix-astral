@@ -1,0 +1,58 @@
+```{r}
+library(ggplot2)
+library(data.table)
+```
+
+```{r}
+data <- fread("ablation.csv")
+data[, mean:=round(mean(loss), 4), by=file]
+data
+```
+
+```{r}
+map_values <- c(
+  "-char" = "no precursor charge", 
+  "-ener" = "no collision energy", 
+  "-mach" = "no mass spectrometer",
+  "-meth" = "no fragmentatio method",
+  "+char" = "only precursor charge", 
+  "+ener" = "only collision energy", 
+  "+mach" = "only mass spectrometer",
+  "+meth" = "only fragmentatio method",
+  "allmeta" = "all metadata attributes", 
+  "nometa" = "no metadata attributes",
+  "prosit" = "prosit metadata attributes",
+)
+
+
+data$name <- data$file
+
+dt[name == "-char", name := "no precursor charge"]
+dt[name == "-char", name := "no precursor charge"]
+```
+
+
+```{r}
+ggplot(data[file %in% c("-char", "-ener", "-mach", "-meth", "allmeta"),], aes(file, loss, fill=file, label=mean)) +
+  geom_violin() +
+  geom_boxplot(width=0.2, outlier.shape = NA) +
+  stat_summary(fun = "mean",
+               geom = "crossbar",
+               width = 0.5,
+               colour = "black") +
+  stat_summary(aes(y=mean-0.03), fun = "mean", geom = "text") +
+  scale_fill_manual(values=c("#F8766D", "#8494FF", "#00B8E7", "#00BE67", "#999999"))
+```
+```{r}
+ggplot(data[file %in% c("+char", "+ener", "+mach", "+meth", "nometa"),], aes(file, loss, fill=file, label=mean)) +
+  geom_violin() +
+  geom_boxplot(width=0.2, outlier.shape = NA) +
+  stat_summary(fun = "mean",
+               geom = "crossbar",
+               width = 0.5,
+               colour = "black") +
+  stat_summary(aes(y=mean-0.03), fun = "mean", geom = "text") +
+  scale_fill_manual(values=c("#F8766D", "#8494FF", "#00B8E7", "#00BE67", "#999999"))
+```
+```
+
