@@ -177,7 +177,7 @@ class TransformerModel(K.Model):
         combined_meta = tf.concat([char_oh, meth_oh, mach_oh, ener[:, None]], axis=1) # (bs, 6+2+3+1)
 
         # ablation study
-        combined_meta = tf.concat([char_oh, ener[:, None]], axis=1) # (bs, 6+2+3+1)
+        #combined_meta = tf.concat([ener[:, None]], axis=1) # (bs, 6+2+3+1)
 
         # print(combined_meta)
         # print(combined_meta.shape)
