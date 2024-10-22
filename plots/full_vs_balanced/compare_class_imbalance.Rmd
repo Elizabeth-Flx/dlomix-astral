@@ -4,6 +4,7 @@
 library(data.table)
 library(ggplot2)
 library(introdataviz)
+library(egg)
 ```
 
 
@@ -17,16 +18,21 @@ data
 ```
 
 ```{r}
-ggplot(data[model %in% c("full", "balanced"),], aes(dataset, loss, fill = model)) +
+pdf("all.pdf", width = 8, height = 12)
+
+p1 <- ggplot(data[model %in% c("full", "balanced"),], aes(dataset, loss, fill = model)) +
   geom_split_violin(scale="area") +
   geom_boxplot(width=0.1, outliers = F, coef=0) + 
-  ggtitle("Full Dataset Model vs Balanced Dataset Model")
+  ggtitle("Full Dataset Model vs Balanced Dataset Model") +
+  theme(plot.title = element_text(hjust = 0.5))
 
-
-ggplot(data[model %in% c("full", "single"),], aes(dataset, loss, fill = model)) +
+p2 <- ggplot(data[model %in% c("full", "single"),], aes(dataset, loss, fill = model)) +
   geom_split_violin(scale="area") +
   geom_boxplot(width=0.1, outliers = F, coef=0) +
-  ggtitle("Full Dataset Model vs Dataset-Specific Models")
+  ggtitle("Full Dataset Model vs Dataset-Specific Models") +
+  theme(plot.title = element_text(hjust = 0.5))
 
+ggarrange(p1,p2, ncol = 1)
+dev.off()
 ```
 
