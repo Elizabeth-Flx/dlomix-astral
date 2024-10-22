@@ -1,0 +1,32 @@
+
+
+```{r}
+library(data.table)
+library(ggplot2)
+library(introdataviz)
+```
+
+
+```{r}
+data <- fread("data.csv")
+
+data$dataset = factor(data$dataset, levels = c("LUM","TOF","AST"))
+data$model = factor(data$model, levels = c("full","balanced","single"))
+
+data
+```
+
+```{r}
+ggplot(data[model %in% c("full", "balanced"),], aes(dataset, loss, fill = model)) +
+  geom_split_violin(scale="area") +
+  geom_boxplot(width=0.1, outliers = F, coef=0) + 
+  ggtitle("Full Dataset Model vs Balanced Dataset Model")
+
+
+ggplot(data[model %in% c("full", "single"),], aes(dataset, loss, fill = model)) +
+  geom_split_violin(scale="area") +
+  geom_boxplot(width=0.1, outliers = F, coef=0) +
+  ggtitle("Full Dataset Model vs Dataset-Specific Models")
+
+```
+

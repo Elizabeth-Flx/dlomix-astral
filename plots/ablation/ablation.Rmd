@@ -14,26 +14,26 @@ map_values <- c(
   "-char" = "no precursor charge", 
   "-ener" = "no collision energy", 
   "-mach" = "no mass spectrometer",
-  "-meth" = "no fragmentatio method",
+  "-meth" = "no fragmentation method",
+  "allmeta" = "all metadata attributes", 
+  
+  "prosit" = "prosit metadata attributes",
+  
   "+char" = "only precursor charge", 
   "+ener" = "only collision energy", 
   "+mach" = "only mass spectrometer",
   "+meth" = "only fragmentatio method",
-  "allmeta" = "all metadata attributes", 
-  "nometa" = "no metadata attributes",
-  "prosit" = "prosit metadata attributes",
+  "nometa" = "no metadata attributes"
 )
 
+data[,name := factor(map_values[file], levels=c(map_values))]
+data <- data[order(name)]
 
-data$name <- data$file
-
-dt[name == "-char", name := "no precursor charge"]
-dt[name == "-char", name := "no precursor charge"]
+data
 ```
 
-
 ```{r}
-ggplot(data[file %in% c("-char", "-ener", "-mach", "-meth", "allmeta"),], aes(file, loss, fill=file, label=mean)) +
+ggplot(data, aes(name, loss, fill=name, label=mean)) +
   geom_violin() +
   geom_boxplot(width=0.2, outlier.shape = NA) +
   stat_summary(fun = "mean",
@@ -41,10 +41,15 @@ ggplot(data[file %in% c("-char", "-ener", "-mach", "-meth", "allmeta"),], aes(fi
                width = 0.5,
                colour = "black") +
   stat_summary(aes(y=mean-0.03), fun = "mean", geom = "text") +
-  scale_fill_manual(values=c("#F8766D", "#8494FF", "#00B8E7", "#00BE67", "#999999"))
+  #scale_fill_manual(values=c("#F8766D", "#8494FF", "#00B8E7", "#00BE67", "#999999")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ```
+
+
 ```{r}
-ggplot(data[file %in% c("+char", "+ener", "+mach", "+meth", "nometa"),], aes(file, loss, fill=file, label=mean)) +
+pdf("one_attribue.pdf", width = 8, height = 6)
+
+ggplot(data[file %in% c("-char", "-ener", "-mach", "-meth", "allmeta"),], aes(name, loss, fill=name, label=mean)) +
   geom_violin() +
   geom_boxplot(width=0.2, outlier.shape = NA) +
   stat_summary(fun = "mean",
@@ -52,7 +57,46 @@ ggplot(data[file %in% c("+char", "+ener", "+mach", "+meth", "nometa"),], aes(fil
                width = 0.5,
                colour = "black") +
   stat_summary(aes(y=mean-0.03), fun = "mean", geom = "text") +
-  scale_fill_manual(values=c("#F8766D", "#8494FF", "#00B8E7", "#00BE67", "#999999"))
+  scale_fill_manual(values=c("#F8766D", "#8494FF", "#00B8E7", "#00BE67", "#999999")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+dev.off()
 ```
+```{r}
+pdf("three_attribue.pdf", width = 8, height = 6)
+
+ggplot(data[file %in% c("+char", "+ener", "+mach", "+meth", "nometa"),], aes(name, loss, fill=name, label=mean)) +
+  geom_violin() +
+  geom_boxplot(width=0.2, outlier.shape = NA) +
+  stat_summary(fun = "mean",
+               geom = "crossbar",
+               width = 0.5,
+               colour = "black") +
+  stat_summary(aes(y=mean-0.03), fun = "mean", geom = "text") +
+  scale_fill_manual(values=c("#F8766D", "#8494FF", "#00B8E7", "#00BE67", "#999999")) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+dev.off()
+```
+
+```{r}
+pdf("prosit_attributes.pdf", width = 8, height = 6)
+
+ggplot(data[file %in% c("allmeta", "prosit", "nometa"),], aes(name, loss, fill=name, label=mean)) +
+  geom_violin() +
+  geom_boxplot(width=0.2, outlier.shape = NA) +
+  stat_summary(fun = "mean",
+               geom = "crossbar",
+               width = 0.5,
+               colour = "black") +
+  stat_summary(aes(y=mean-0.03), fun = "mean", geom = "text") +
+  scale_fill_manual(values=c("#999999", "#999999", "#999999")) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+dev.off()
+```
+
+```{r}
+data[, median(loss), by=file]
 ```
 

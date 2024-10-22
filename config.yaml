@@ -1,7 +1,7 @@
 # large or small dataset
 
 dataloader:
-  dataset: full      # full | small
+  dataset: balanced      # full | small
   batch_size: 1024   # default 2048
   load_data: True
 
@@ -15,7 +15,7 @@ model_settings:
   penultimate_units: 512
   alphabet: False
   dropout: 0.1
-  integration_method: FiLM_mult       # embed_input | multi_token | single_token | token_summation | inject | adaptive
+  integration_method: single_both       # embed_input | multi_token | single_token | token_summation | inject | adaptive
   norm_type: layer               # layer | batch | adaptive
   inject_pre: True          # inject before Attention block
   inject_post: False         # inject into FFN
@@ -37,4 +37,4 @@ train_settings:
 wandb_settings:
   log_wandb: True
   # name: test_run
-  project: full_methods
+  project: full_vs_balanced
