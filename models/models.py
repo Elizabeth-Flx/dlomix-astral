@@ -256,6 +256,9 @@ class TransformerModel(K.Model):
 
         if self.integration_method in ['single_token', 'multi_token']:           # todo make this better (low prio)
             out = tf.concat([out, metadata], axis=1)
+        elif self.integration_method == "embed_input":
+            metadata = tf.tile(metadata, [1, 30, 1])
+            out = tf.concat([out, metadata], axis=2)
 
         out = self.Main(out, metadata)     # Transformer blocks
 
