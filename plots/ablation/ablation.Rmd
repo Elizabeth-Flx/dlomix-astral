@@ -17,7 +17,7 @@ map_values <- c(
   "-meth" = "No Fragmentation Method",
   "allmeta" = "All Metadata Attributes", 
   
-  "prosit" = "Prosit Metadata Attributes",
+  "prosit" = "Collision Energy + Precursor Charge",
   
   "+char" = "Only Precursor Charge", 
   "+ener" = "Only Collision Energy", 
@@ -47,73 +47,160 @@ ggplot(data, aes(name, loss, fill=name, label=mean)) +
 
 
 ```{r}
-pdf("one_attribue.pdf", width = 10, height = 6)
+# pdf("one_attribue.pdf", width = 10, height = 6)
 
-ggplot(data[file %in% c("-char", "-ener", "-mach", "-meth", "allmeta"),], aes(y=name, x=loss, fill=name, label=median)) +
+full_one <- ggplot(data[file %in% c("-char", "-ener", "-mach", "-meth", "allmeta"),], aes(x=name, y=loss, fill=name, label=median)) +
   geom_violin() +
   geom_boxplot(width=0.2, outlier.shape = NA) +
   # stat_summary(fun = "mean",
   #              geom = "crossbar",
   #              width = 0.5,
   #              colour = "black") +
-  stat_summary(aes(x=median-0.04), fun = "median", geom = "text") +
+  # stat_summary(aes(y=median-0.04), fun = "median", geom = "text") +
   scale_fill_manual(values=c("#F8766D", "#8494FF", "#00B8E7", "#00BE67", "#999999")) +
   theme_light() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=10),
-        axis.text.y = element_text(size = 14),
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=0),
+        axis.text.y = element_text(size = 10),
         legend.position = "none") +
-  xlim(0., 1) + 
-  xlab("Spectral Angle on Validation Set") +
-  ylab(NULL)
+  ylab("Spectral Angle on Test Set") +
+  xlab(NULL)
 
-dev.off()
+full_one
+# dev.off()
 ```
 ```{r}
-pdf("three_attribue.pdf", width = 10, height = 6)
+small_one <- ggplot(data[file %in% c("-char", "-ener", "-mach", "-meth", "allmeta"),], aes(x=name, y=loss, fill=name, label=median)) +
+  # geom_violin() +
+  geom_boxplot(width=0.4, outlier.shape = NA) +
+  # stat_summary(fun = "mean",
+  #              geom = "crossbar",
+  #              width = 0.5,
+  #              colour = "black") +
+  stat_summary(aes(y=median-0.03), fun = "median", geom = "text", angle = 90, size=5) +
+  scale_fill_manual(values=c("#F8766D", "#8494FF", "#00B8E7", "#00BE67", "#999999")) +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size=14),
+        axis.text.y = element_text(size = 10),
+        legend.position = "none") +
+  ylab("Spectral Angle on Test Set") +
+  xlab(NULL) +
+  coord_cartesian(ylim = c(0.65,.90))
 
-ggplot(data[file %in% c("+char", "+ener", "+mach", "+meth", "nometa"),], aes(y=name, x=loss, fill=name, label=median)) +
+small_one
+```
+
+
+
+```{r}
+# pdf("three_attribue.pdf", width = 10, height = 6)
+
+full_three <- ggplot(data[file %in% c("+char", "+ener", "+mach", "+meth", "nometa"),], aes(x=name, y=loss, fill=name, label=median)) +
   geom_violin() +
   geom_boxplot(width=0.2, outlier.shape = NA) +
   # stat_summary(fun = "mean",
   #              geom = "crossbar",
   #              width = 0.5,
   #              colour = "black") +
-  stat_summary(aes(x=median-0.04), fun = "median", geom = "text") +
+  # stat_summary(aes(y=median-0.04), fun = "median", geom = "text") +, angle = 90
   scale_fill_manual(values=c("#F8766D", "#8494FF", "#00B8E7", "#00BE67", "#999999")) + 
   theme_light() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=12),
-        axis.text.y = element_text(size = 14),
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=0),
+        axis.text.y = element_text(size = 10),
         legend.position = "none") +
-  xlim(0., 1) + 
-  xlab("Spectral Angle on Validation Set") +
+  ylab(NULL) +
+  xlab(NULL) +
+  scale_y_continuous(position = "right") 
+
+full_three
+# dev.off()
+```
+```{r}
+small_three <- ggplot(data[file %in% c("+char", "+ener", "+mach", "+meth", "nometa"),], aes(x=name, y=loss, fill=name, label=median)) +
+  # geom_violin() +
+  geom_boxplot(width=0.4, outlier.shape = NA) +
+  # stat_summary(fun = "mean",
+  #              geom = "crossbar",
+  #              width = 0.5,
+  #              colour = "black") +
+  stat_summary(aes(y=median-0.03), fun = "median", geom = "text", angle = 90, size=5) +
+  scale_fill_manual(values=c("#F8766D", "#8494FF", "#00B8E7", "#00BE67", "#999999")) + 
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size=14),
+        axis.text.y = element_text(size = 10),
+        legend.position = "none") +
+  ylab(NULL) +
+  xlab(NULL) + 
+  coord_cartesian(ylim = c(0.65,.90)) +
+  scale_y_continuous(position = "right") 
+
+small_three
+```
+
+```{r}
+pdf("all_ablation.pdf", width = 10, height = 14)
+ggarrange(full_one, full_three, small_one, small_three, 
+          nrow = 2, ncol = 2, heights = c(3,2))
+dev.off()
+```
+
+
+
+
+
+
+```{r}
+# pdf("prosit_attributes.pdf", width = 10, height = 5)
+
+prosit_full <- ggplot(data[file %in% c("allmeta", "prosit", "nometa"),], aes(x=name, y=loss, fill=name, label=median)) +
+  geom_violin() +
+  geom_boxplot(width=0.1, outlier.shape = NA) +
+  # stat_summary(fun = "mean",
+  #              geom = "crossbar",
+  #              width = 0.5,
+  #              colour = "black") +
+  stat_summary(aes(y=median-0.04), fun = "median", geom = "text") +
+  scale_fill_manual(values=c("#d3c3f7", "#abc9ea", "#999999")) + 
+  theme_light() +
+  theme(axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size = 14),
+        legend.position = "none",
+        axis.title.x = element_text(size = 14)) + 
+  xlab("Spectral Angle on Test Set") +
   ylab(NULL)
+
+prosit_full
 
 # dev.off()
 ```
 
 ```{r}
-pdf("prosit_attributes.pdf", width = 10, height = 5)
 
-ggplot(data[file %in% c("allmeta", "prosit", "nometa"),], aes(y=name, x=loss, fill=name, label=median)) +
-  geom_violin() +
-  geom_boxplot(width=0.2, outlier.shape = NA) +
+prosit_zoomed <- ggplot(data[file %in% c("allmeta", "prosit", "nometa"),], aes(x=name, y=loss, fill=name, label=median)) +
+  # geom_violin() +
+  geom_boxplot(width=0.5, outlier.shape = NA) +
   # stat_summary(fun = "mean",
   #              geom = "crossbar",
   #              width = 0.5,
   #              colour = "black") +
-  stat_summary(aes(x=median-0.04), fun = "median", geom = "text") +
+  stat_summary(aes(y=median-0.04), fun = "median", geom = "text") +
   scale_fill_manual(values=c("#d3c3f7", "#abc9ea", "#999999")) + 
   theme_light() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=12),
-        axis.text.y = element_text(size = 14),
-        legend.position = "none") + 
-  xlab("Spectral Angle on Validation Set") +
-  ylab(NULL)
+  theme(axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size = 0),
+        legend.position = "none",
+        axis.title.x = element_text(size = 14)) + 
+  ylab("Spectral Angle on Test Set") +
+  xlab(NULL) +
+  coord_cartesian(ylim = c(0.73,.91))
 
-dev.off()
+prosit_zoomed
 ```
 
 ```{r}
-data[, median(loss), by=file]
+pdf("prosit_attributes_more.pdf", width = 15, height = 6)
+ggarrange(prosit_full, prosit_zoomed, nrow = 1, ncol = 2, widths = c(3,1.5))
+dev.off()
 ```
+
+
 

@@ -191,6 +191,8 @@ inp = [m for m in int_data.tensor_train_data.take(1)][0][0]
 out = model(inp)
 model.summary()
 
+# throw error to stop here
+raise ValueError("Model compiled")
 
 print(len(int_data.tensor_train_data))
 

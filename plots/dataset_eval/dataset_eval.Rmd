@@ -1,0 +1,239 @@
+```{r}
+library(arrow)
+library(ggplot2)
+library(data.table)
+```
+
+```{r}
+df <- read_parquet("/cmnfs/proj/prosit_astral/datasets/full_dlomix_format_test_fixed.parquet")
+df <- as.data.table(df)
+
+df[machine=="TOF", machine:="timsTOF_Pro"]
+df[machine=="Astral", machine:="Orbitrap_Astral"]
+
+df[,machine:=factor(machine, levels = c("Orbitrap_Fusion_Lumos", "timsTOF_Pro", "Orbitrap_Astral"))]
+df[,charge:=factor(charge)]
+
+df
+```
+
+```{r}
+df_train <- read_parquet("/cmnfs/proj/prosit_astral/datasets/full_dlomix_format_train_fixed.parquet")
+df_train
+```
+
+
+```{r}
+pred <- fread("/nfs/home/students/d.lochert/projects/astral/dlomix-astral/plots/f_r_single_both_d5_static_0.0005_GTs_predictions.csv")
+pred
+```
+
+
+```{r}
+df <- as.data.table(head(df, 51200))[, pred_loss := pred$V1]
+df[, pred_angle := 1-pred_loss]
+df[, length := nchar(prosit_sequence)]
+
+df[machine=="TOF", machine:="timsTOF_Pro"]
+df[machine=="Astral", machine:="Orbitrap_Astral"]
+
+df[,machine:=factor(machine, levels = c("Orbitrap_Fusion_Lumos", "timsTOF_Pro", "Orbitrap_Astral"))]
+df[,charge:=factor(charge)]
+
+df_train[machine=="TOF", machine:="timsTOF_Pro"]
+df_train[machine=="Astral", machine:="Orbitrap_Astral"]
+
+df_train[,machine:=factor(machine, levels = c("Orbitrap_Fusion_Lumos", "timsTOF_Pro", "Orbitrap_Astral"))]
+df_train[,charge:=factor(charge)]
+
+
+df
+```
+
+```{r}
+pdf("charge_dist.pdf", width = 8, height = 4)
+
+ggplot(df, aes(collision_energy, fill=machine)) + 
+  geom_histogram(bins=100) + 
+  facet_grid(rows = vars(machine, method_nr), scales = "free_y", switch = "y") + 
+  coord_cartesian(xlim = c(0.1,.45)) +
+  xlab("Collision Energy") +
+  ylab("Spectra Count") +
+  theme_light() + 
+  theme(strip.text.y.left = element_text(angle = 0))
+
+
+
+dev.off()
+```
+```{r}
+ggplot(df, aes(collision_energy)) + 
+  geom_histogram() + 
+  facet_wrap(~method_nr, scales="free")
+```
+
+
+
+
+```{r}
+ggplot(df, aes(charge)) + 
+  geom_bar() + 
+  facet_wrap(~machine, scales="free")
+```
+
+```{r}
+ggplot(df, aes(pred_loss)) +
+  geom_histogram() +
+  facet_grid(~method_nr)
+```
+
+```{r}
+ggplot(df, aes(y=factor(machine), x=pred_angle, fill=factor(machine))) +
+  geom_violin() +
+  geom_boxplot(width=0.2, outlier.shape = NA) +
+  # stat_summary(fun = "mean",
+  #              geom = "crossbar",
+  #              width = 0.5,
+  #              colour = "black") +
+  # stat_summary(aes(x=median-0.04), fun = "median", geom = "text") +
+  # scale_fill_manual(values=c("#d3c3f7", "#abc9ea", "#999999")) + 
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=12),
+        axis.text.y = element_text(size = 14),
+        legend.position = "none") + 
+  xlab("Spectral Angle on Validation Set") +
+  ylab(NULL) +
+  coord_cartesian(xlim=c(0.5,1))
+```
+
+```{r}
+# Loss by machine
+
+df_machine_counts <- data.frame(
+  machine=c("Orbitrap_Fusion_Lumos","timsTOF_Pro","Orbitrap_Atral"),
+  counts=c(12212102,185260,277126),
+  label=c("12,212,102", "185,260", "277,126")
+)
+
+
+plot1_machine <- ggplot(df_machine_counts, aes(machine, counts, fill=machine))+
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label = label), vjust = 1.5, colour = "black") +
+  theme_light() +
+  scale_y_log10() +
+  scale_fill_manual(values=c("#d3c3f7", "#abc9ea", "#AEEB8A")) +
+  theme(axis.title.x = element_blank(), axis.text.x = element_blank()) +
+  theme(axis.ticks.length.x = unit(0, "cm")) +
+  theme(plot.margin = unit(c(0,0,0,0), "cm")) +
+  theme(legend.position = "none") +
+  ylab("Number of Training Spectra") +
+  theme(axis.title.y=element_text(size=10))
+
+plot1_machine
+
+df[, median:=round(median(pred_angle), 4), by=machine]
+
+plot2_machine <- ggplot(df, aes(machine, pred_angle, fill=machine, label=median))+
+  geom_violin() +
+  geom_boxplot(width=0.1, outlier.shape = NA) + 
+  stat_summary(aes(y=1.02), fun = "median", geom = "text") +
+  scale_fill_manual(values=c("#d3c3f7", "#abc9ea", "#AEEB8A")) +
+  theme_light() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=12)) +
+  xlab(NULL) +
+  ylab("Spectral Angle on Test Set") +
+  theme(axis.title.y=element_text(size=10))
+
+plot2_machine
+
+png("loss_machine.png", width = 5*60, height = 10*60)
+ggarrange(plot1_machine, plot2_machine, nrow = 2, heights = c(1, 3))
+dev.off()
+```
+
+```{r}
+# Loss by charge
+
+plot1_charge <- ggplot(df[charge!=6], aes(charge, fill=charge))+
+  geom_bar() + 
+  geom_text(aes(label = ..count..), stat = "count", vjust = 1.5, colour = "black") +
+  theme_light() +
+  scale_y_log10() +
+  theme(axis.title.x = element_blank(), axis.text.x = element_blank()) +
+  theme(axis.ticks.length.x = unit(0, "cm")) +
+  theme(plot.margin = unit(c(0,0,0,0), "cm")) +
+  theme(legend.position = "none") +
+  ylab("Spectra Count") +
+  theme(axis.title.y=element_text(size=8))
+
+plot1_charge
+
+df[, median:=round(median(pred_angle), 4), by=charge]
+
+plot2_charge <- ggplot(df[charge!=6], aes(charge, pred_angle, fill=charge, label=median))+
+  geom_violin() +
+  geom_boxplot(width=0.1, outlier.shape = NA) +
+  stat_summary(aes(y=1.02), fun = "median", geom = "text") +
+  theme_light() +
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  xlab("Precursor Charge") +
+  ylab("Spectral Angle on Test Set") +
+  theme(axis.title.y=element_text(size=8))
+
+
+plot2_charge
+
+pdf("loss_charge.pdf", width = 6, height = 8)
+ggarrange(plot1_charge, plot2_charge, nrow = 2, heights = c(1, 3))
+dev.off()
+```
+
+```{r}
+ggarrange(plot1_machine, plot1_charge, plot2_machine, plot2_charge, nrow = 2, ncol = 2, heights = c(1, 3))
+```
+
+
+```{r}
+ggplot(df, aes(length, fill=factor(charge))) + 
+  geom_bar() +
+  facet_grid(~factor(charge))
+
+df[, .(mean(length)), by=factor(charge)][order(V1)]
+```
+
+```{r}
+df[, bins:= cut(collision_energy, breaks = 5, labels = 1:5)]
+df
+```
+
+```{r}
+0.315386295318604
+0.316588521003723
+0.314255684614182
+0.195157110691071
+0.201140388846397
+0.197958201169968
+0.182166531682014
+0.177591308951378
+0.180167838931084
+
+no_meta_loss <- c(0.315386295318604, 0.316588521003723, 0.314255684614182)
+prosit_meta_loss <- c(0.195157110691071, 0.201140388846397, 0.197958201169968)
+all_meta_loss <- c(0.182166531682014, 0.177591308951378, 0.180167838931084)
+
+t.test(no_meta_loss, prosit_meta_loss)
+
+t.test(all_meta_loss, prosit_meta_loss)
+
+
+
+```
+
+
+```{r}
+ggplot(df, aes(bins, pred_angle, fill=bins , label=bins))+
+  geom_violin()
+```
+
